@@ -40,12 +40,12 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
   <a href="https://push.justsong.cn">在线演示</a>
 </p>
 
-> **Fork 说明**：本仓库基于 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) `v0.4.9`，新增**中国移动新消息（5G 消息 / ClawBot）**原生 Go 推送通道 `cmcc`，协议参考 [x-dr/cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)。属于非官方实现，与中国移动无隶属关系。
+> **Fork 说明**：本仓库基于 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) `master` 分支提交 `fbbfa58`（2025-11-22，`git describe --tags` 为 `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新），新增**中国移动新消息（5G 消息 / ClawBot）**原生 Go 推送通道 `cmcc`，协议参考 [x-dr/cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)。属于非官方实现，与中国移动无隶属关系。
 >
 > - 通道实现：`channel/cmcc.go`，配置方法见[中国移动新消息通道](#中国移动新消息通道)
-> - 编译：`.github/workflows/build-cmcc-linux-amd64.yml` 支持手动触发，产出带 SQLite 的 Linux amd64 静态二进制；仓库已附带 `web/build`，无需安装 Node
+> - 编译：`.github/workflows/build-cmcc-linux-amd64.yml` 支持 push 到 `main` 自动触发与手动触发，产出带 SQLite 的 Linux amd64 静态二进制；仓库已附带 `web/build`，无需安装 Node
 > - 诊断工具：`go build ./cmd/cmcc-probe` 生成独立的链路测试程序
-> - `VERSION` 随仓库提供（上游 CI 是用 `git describe --tags` 现场生成的，源码仓库里原本没有）
+> - `VERSION` = `v0.4.13-alpha-4-gfbbfa58+cmcc`，随仓库提供（上游 CI 用 `git describe --tags` 现场生成，源码仓库原本没有该文件）
 > - `docker-compose.cmcc.yml` 基于本地源码构建，官方镜像不含本通道
 
 > **Warning**：原域名（msgpusher.com）将于 2026-11-24 下线，请尽快迁移至 https://push.justsong.cn
