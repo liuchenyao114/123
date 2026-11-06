@@ -21,7 +21,6 @@ const (
 	TypeGroup             = "group"
 	TypeLarkApp           = "lark_app"
 	TypeCustom            = "custom"
-	TypeTencentAlarm      = "tencent_alarm"
 	TypeCmcc              = "cmcc"
 )
 

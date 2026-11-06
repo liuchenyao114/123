@@ -66,7 +66,6 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
    + WebSocket 客户端（[官方客户端](https://github.com/songquanpeng/personal-assistant)，[接入文档](./docs/API.md#websocket-客户端)），
    + Telegram 机器人，
    + Discord 群机器人，
-   + 腾讯云自定义告警：免费的短信提醒，
    + 中国移动新消息（5G 消息 / ClawBot）：推送到手机「新消息」应用号，
    + **群组消息**：可以将多个推送通道组合成一个群组，然后向群组发送消息，可以实现一次性推送到多个渠道的功能，
    + **自定义消息**：可以自定义消息请求 URL 和请求体格式，实现与其他服务的对接，支持[众多第三方服务](https://iamazing.cn/page/message-pusher-common-custom-templates)。
@@ -222,9 +221,8 @@ proxy_send_timeout 300s;
       12. `one_api`：通过 OneAPI 协议推送消息到 QQ。
       13. `group`：通过预先配置的消息推送通道群组进行推送。
       14. `custom`：通过预先配置好的自定义推送通道进行推送。
-      15. `tencent_alarm`：通过腾讯云监控告警进行推送，仅支持 `description` 字段。
-      16. `none`：仅保存到数据库，不做推送。
-      17. `cmcc`：通过中国移动「新消息 ClawBot」推送到手机 5G 消息（配置方法见[中国移动新消息通道](#中国移动新消息通道)）。
+      15. `none`：仅保存到数据库，不做推送。
+      16. `cmcc`：通过中国移动「新消息 ClawBot」推送到手机 5G 消息（配置方法见[中国移动新消息通道](#中国移动新消息通道)）。
    5. `token`：如果你在后台设置了推送 token，则此项必填。另外可以通过设置 HTTP `Authorization` 头部设置此项。
       * 注意令牌有两种，一种是全局鉴权令牌，一种是通道维度的令牌，前者可以鉴权任何通道，后者只能鉴权指定通道。
    6. `url`：选填，如果不填则系统自动为消息生成 URL，其内容为消息详情。
@@ -256,7 +254,6 @@ proxy_send_timeout 300s;
 |    `client`     |    ✅    |       ✅       |     ❌     |   ❌   |  ❌   |      ❌      |
 |   `telegram`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ✅      |
 |    `discord`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ❌      |
-| `tencent_alarm` |    ❌    |       ✅       |     ❌     |   ❌   |  ❌   |      ❌      |
 |     `cmcc`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ❌      |
 
 注意：

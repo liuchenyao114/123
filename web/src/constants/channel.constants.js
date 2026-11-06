@@ -54,12 +54,6 @@ export const CHANNEL_OPTIONS = [
     color: '#FF9800',
   },
   {
-    key: 'tencent_alarm',
-    text: '腾讯云消息告警',
-    value: 'tencent_alarm',
-    color: '#00a4ff',
-  },
-  {
     key: 'cmcc',
     text: '中国移动新消息（5G 消息）',
     value: 'cmcc',
