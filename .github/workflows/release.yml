@@ -1,0 +1,208 @@
+# 多平台构建并自动发布正式 Release（非 draft）。
+# 触发：push v* tag（与上游一致），或手动 dispatch 指定版本号（会自动补建 tag）。
+# 产物：linux/amd64、linux/arm64、windows/amd64、macOS —— 全部启用 CGO，SQLite 可用。
+# 说明：上游的 linux/windows/macos-release 与 docker-image-* 已改为仅手动触发，
+#       避免打 tag 时多个 workflow 抢发 Release 或因缺少 Docker secrets 失败。
+name: Release (multi-platform)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号，例如 v0.4.13-cmcc.1'
+        required: true
+        default: 'v0.4.13-cmcc.1'
+
+permissions:
+  contents: write
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.value }}
+    steps:
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${{ github.ref_name }}"
+          fi
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+          echo "release version: $V"
+
+  linux:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build frontend
+        env:
+          CI: ''
+          DISABLE_ESLINT_PLUGIN: 'true'
+          GENERATE_SOURCEMAP: 'false'
+          REACT_APP_VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          cd web
+          npm install --no-audit --no-fund
+          npm run build
+          cd ..
+          test -f web/build/index.html
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+      - name: Build linux/amd64
+        env:
+          CGO_ENABLED: '1'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go mod download
+          go build -trimpath \
+            -ldflags "-s -w -X 'message-pusher/common.Version=${{ needs.meta.outputs.version }}' -extldflags '-static'" \
+            -o message-pusher-cmcc-linux-amd64 .
+          file message-pusher-cmcc-linux-amd64
+      - name: Build linux/arm64
+        env:
+          CC: aarch64-linux-gnu-gcc
+          CGO_ENABLED: '1'
+          GOOS: linux
+          GOARCH: arm64
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-aarch64-linux-gnu
+          go build -trimpath \
+            -ldflags "-s -w -X 'message-pusher/common.Version=${{ needs.meta.outputs.version }}' -extldflags '-static'" \
+            -o message-pusher-cmcc-linux-arm64 .
+          file message-pusher-cmcc-linux-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: message-pusher-cmcc-linux
+          path: |
+            message-pusher-cmcc-linux-amd64
+            message-pusher-cmcc-linux-arm64
+          if-no-files-found: error
+
+  windows:
+    needs: meta
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build frontend
+        env:
+          CI: ''
+          DISABLE_ESLINT_PLUGIN: 'true'
+          GENERATE_SOURCEMAP: 'false'
+          REACT_APP_VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          cd web
+          npm install --no-audit --no-fund
+          npm run build
+          cd ..
+          test -f web/build/index.html
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+      - name: Build windows/amd64
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          go mod download
+          go build -trimpath \
+            -ldflags "-s -w -X 'message-pusher/common.Version=${{ needs.meta.outputs.version }}'" \
+            -o message-pusher-cmcc-windows-amd64.exe .
+          ls -lh message-pusher-cmcc-windows-amd64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: message-pusher-cmcc-windows
+          path: message-pusher-cmcc-windows-amd64.exe
+          if-no-files-found: error
+
+  macos:
+    needs: meta
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build frontend
+        env:
+          CI: ''
+          DISABLE_ESLINT_PLUGIN: 'true'
+          GENERATE_SOURCEMAP: 'false'
+          REACT_APP_VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          cd web
+          npm install --no-audit --no-fund
+          npm run build
+          cd ..
+          test -f web/build/index.html
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+      - name: Build macOS
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          go mod download
+          ARCH=$(uname -m)
+          go build -trimpath \
+            -ldflags "-s -w -X 'message-pusher/common.Version=${{ needs.meta.outputs.version }}'" \
+            -o "message-pusher-cmcc-darwin-$ARCH" .
+          ls -lh message-pusher-cmcc-darwin-*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: message-pusher-cmcc-macos
+          path: message-pusher-cmcc-darwin-*
+          if-no-files-found: error
+
+  release:
+    needs: [meta, linux, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: message-pusher-cmcc-*
+          merge-multiple: true
+          path: dist
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          ls -lh dist
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION" >/dev/null 2>&1; then
+            echo "creating tag $VERSION"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$VERSION" -f "sha=$GITHUB_SHA"
+          fi
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release upload "$VERSION" dist/* --clobber
+          else
+            gh release create "$VERSION" dist/* --title "$VERSION" --generate-notes --latest
+          fi

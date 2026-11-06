@@ -13,8 +13,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - '*'
 
 jobs:
   build-linux-amd64:
