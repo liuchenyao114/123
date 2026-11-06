@@ -1,7 +1,7 @@
 # 在 GitHub 托管的 Linux runner 上原生编译整合后的 message-pusher。
 # 与上游 linux-release.yml 的区别：
 #   1. 支持 workflow_dispatch 手动触发，不必打 tag
-#   2. 若仓库已带 web/build（本交付包内含），跳过 npm，构建更快
+#   2. 总是从源码构建前端，保证产物与源码、VERSION 一致（仓库内 web/build 仅供离线编译）
 #   3. 版本号从 VERSION 文件读取，不依赖 git tag
 #   4. 产物作为 Actions Artifact 下载，不自动发 Release
 #
@@ -41,21 +41,18 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Prepare frontend
+      - name: Build frontend from source
         env:
           CI: ''
           DISABLE_ESLINT_PLUGIN: 'true'
           GENERATE_SOURCEMAP: 'false'
           REACT_APP_VERSION: ${{ steps.ver.outputs.value }}
         run: |
-          if [ -f web/build/index.html ]; then
-            echo '随仓库提供的 web/build 已存在，跳过前端构建'
-          else
-            cd web
-            npm install --no-audit --no-fund
-            npm run build
-            cd ..
-          fi
+          # 每次都从源码构建：避免仓库预置的 web/build 与源码、VERSION 不一致
+          cd web
+          npm install --no-audit --no-fund
+          npm run build
+          cd ..
           test -f web/build/index.html
 
       - name: Set up Go
