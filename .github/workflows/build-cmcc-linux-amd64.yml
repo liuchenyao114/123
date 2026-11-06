@@ -1,0 +1,92 @@
+# 在 GitHub 托管的 Linux runner 上原生编译整合后的 message-pusher。
+# 与上游 linux-release.yml 的区别：
+#   1. 支持 workflow_dispatch 手动触发，不必打 tag
+#   2. 若仓库已带 web/build（本交付包内含），跳过 npm，构建更快
+#   3. 版本号从 VERSION 文件读取，不依赖 git tag
+#   4. 产物作为 Actions Artifact 下载，不自动发 Release
+#
+# 用法：把本文件随源码推到自己的 GitHub 仓库 → Actions → Build message-pusher (cmcc) → Run workflow → 下载 artifact。
+name: Build message-pusher (cmcc)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -f VERSION ]; then
+            V=$(tr -d '\r\n' < VERSION)
+          else
+            V=$(git describe --tags --always 2>/dev/null || echo dev)
+          fi
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+          echo "version: $V"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Prepare frontend
+        env:
+          CI: ''
+          DISABLE_ESLINT_PLUGIN: 'true'
+          GENERATE_SOURCEMAP: 'false'
+          REACT_APP_VERSION: ${{ steps.ver.outputs.value }}
+        run: |
+          if [ -f web/build/index.html ]; then
+            echo '随仓库提供的 web/build 已存在，跳过前端构建'
+          else
+            cd web
+            npm install --no-audit --no-fund
+            npm run build
+            cd ..
+          fi
+          test -f web/build/index.html
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Build backend (CGO enabled, static, SQLite works)
+        env:
+          CGO_ENABLED: '1'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go mod download
+          go build -trimpath \
+            -ldflags "-s -w -X 'message-pusher/common.Version=${{ steps.ver.outputs.value }}' -extldflags '-static'" \
+            -o message-pusher-cmcc-linux-amd64 .
+          file message-pusher-cmcc-linux-amd64
+
+      - name: Smoke test (verify SQLite actually usable)
+        run: |
+          ./message-pusher-cmcc-linux-amd64 --version || true
+          timeout 12s ./message-pusher-cmcc-linux-amd64 --port 3999 > /tmp/mp.log 2>&1 || true
+          tail -20 /tmp/mp.log
+          if grep -q 'CGO_ENABLED=0\|requires cgo' /tmp/mp.log; then
+            echo '::error::SQLite 驱动是 stub，构建未启用 cgo'
+            exit 1
+          fi
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: message-pusher-cmcc-linux-amd64
+          path: message-pusher-cmcc-linux-amd64
+          if-no-files-found: error

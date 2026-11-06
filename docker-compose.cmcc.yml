@@ -1,0 +1,20 @@
+# 基于本地源码构建：官方镜像 justsong/message-pusher 不包含新增的 cmcc 通道，
+# 因此这里必须用 build，而不是 image。
+# 用法：docker compose -f docker-compose.cmcc.yml up -d --build
+services:
+  message-pusher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: message-pusher-cmcc:local
+    container_name: message-pusher-cmcc
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - TZ=Asia/Shanghai
+      # 改成自己的随机字符串，否则每次重建容器后登录态会失效
+      - SESSION_SECRET=CHANGE_ME_TO_A_RANDOM_STRING
+    volumes:
+      - ./data:/data
+      - /etc/localtime:/etc/localtime:ro

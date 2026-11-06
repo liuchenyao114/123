@@ -1,0 +1,7 @@
+.idea
+.vscode
+upload
+*.exe
+*.db
+# 只忽略根目录的构建输出；web/build 随仓库提交，便于 CI 跳过 npm
+/build
