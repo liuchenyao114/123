@@ -61,7 +61,7 @@ export const CHANNEL_OPTIONS = [
   },
   {
     key: 'multi',
-    text: '多通道组合',
+    text: '多通道组合（可勾选多个渠道）',
     value: 'multi',
     color: '#6f42c1',
   },

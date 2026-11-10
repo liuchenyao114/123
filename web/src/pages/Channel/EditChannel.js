@@ -5,6 +5,100 @@ import { API, generateToken, showError, showSuccess } from '../../helpers';
 import { CHANNEL_OPTIONS } from '../../constants';
 import axios from 'axios';
 
+// multi 通道可勾选的子渠道及各自的参数字段。
+// name 对应后端 multiSubChannel 的 JSON 字段，含义与单通道编辑页完全一致。
+const MULTI_SUB_FIELDS = {
+  test: [
+    { name: 'app_id', label: '测试号 ID', placeholder: '测试号信息 -> appID' },
+    { name: 'secret', label: '测试号密钥', password: true },
+    { name: 'other', label: '测试模板 ID', placeholder: '模板消息接口 -> 模板 ID' },
+    { name: 'account_id', label: '用户 Open ID', placeholder: '扫描二维码 -> 用户列表 -> 微信号' },
+  ],
+  corp_app: [
+    {
+      name: 'app_id',
+      label: '企业 ID | AgentId',
+      placeholder: '两者用 | 分隔，例如 ww123456|1000002',
+    },
+    { name: 'secret', label: '应用 Secret', password: true },
+    { name: 'account_id', label: '用户账号', placeholder: '通讯录 -> 点击姓名 -> 账号' },
+    { name: 'other', label: '客户端类型', placeholder: 'plugin 或 app' },
+  ],
+  corp: [
+    {
+      name: 'url',
+      label: 'Webhook 地址',
+      placeholder: '企业微信群机器人的 Webhook 地址',
+    },
+  ],
+  lark: [
+    { name: 'url', label: 'Webhook 地址', placeholder: '飞书群机器人 Webhook 地址' },
+    { name: 'secret', label: '签名校验密钥', password: true },
+  ],
+  lark_app: [
+    { name: 'app_id', label: 'App ID' },
+    { name: 'secret', label: 'App Secret', password: true },
+    {
+      name: 'account_id',
+      label: '默认推送目标',
+      placeholder: '格式必须为：<类型>:<ID>，例如 open_id:123456',
+    },
+  ],
+  ding: [
+    { name: 'url', label: 'Webhook 地址', placeholder: '钉钉群机器人 Webhook 地址' },
+    { name: 'secret', label: '签名校验密钥', password: true },
+  ],
+  bark: [
+    { name: 'url', label: '服务器地址', placeholder: '选填，默认 https://api.day.app' },
+    { name: 'secret', label: '推送 key', password: true },
+  ],
+  client: [{ name: 'secret', label: '客户端连接密钥', password: true }],
+  telegram: [
+    { name: 'secret', label: '机器人令牌', password: true },
+    { name: 'account_id', label: '会话 ID' },
+  ],
+  discord: [{ name: 'url', label: 'Webhook 地址', placeholder: 'Discord Webhook URL' }],
+  one_bot: [
+    { name: 'url', label: '服务器地址' },
+    { name: 'secret', label: 'access token', password: true },
+    { name: 'account_id', label: '默认推送目标', placeholder: '例如 QQ 号或 group_123456789' },
+  ],
+  custom: [
+    { name: 'url', label: '请求地址', placeholder: '必须使用 HTTPS 协议' },
+    {
+      name: 'other',
+      label: '请求体（JSON，支持模板变量）',
+      placeholder: '{"title":"$title","content":"$content"}',
+      textarea: true,
+    },
+  ],
+  cmcc: [
+    {
+      name: 'secret',
+      label: 'API Key',
+      placeholder: '中国移动新消息 ClawBot 分配的 API Key',
+      password: true,
+    },
+    {
+      name: 'account_id',
+      label: '默认接收人',
+      placeholder: '选填，留空则自动使用最近一条入站消息的发送方',
+    },
+    { name: 'app_id', label: '协议版本', placeholder: '选填，默认 2.0' },
+    { name: 'url', label: 'WebSocket 服务地址', placeholder: '选填，默认官方地址' },
+    { name: 'other', label: '入站消息 Webhook', placeholder: '选填' },
+  ],
+};
+
+const MULTI_SUB_OPTIONS = CHANNEL_OPTIONS.filter(
+  (o) => MULTI_SUB_FIELDS[o.value] !== undefined
+).map((o) => ({ key: o.value, text: o.text, value: o.value }));
+
+const multiSubLabel = (t) => {
+  const found = MULTI_SUB_OPTIONS.find((o) => o.value === t);
+  return found ? found.text : t || '未知渠道';
+};
+
 const EditChannel = () => {
   const params = useParams();
   const channelId = params.id;
@@ -25,6 +119,8 @@ const EditChannel = () => {
   };
 
   const [inputs, setInputs] = useState(originInputs);
+  const [multiSelected, setMultiSelected] = useState([]);
+  const [showMultiJson, setShowMultiJson] = useState(false);
   const { type, name, description, secret, app_id, account_id, url, other } =
     inputs;
 
@@ -32,16 +128,59 @@ const EditChannel = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   };
 
-  const appendMultiSub = (tpl) => {
-    let list = [];
+  // multi 通道的子渠道列表存于 other 字段（JSON 数组）。
+  // 返回 null 表示当前 JSON 非法，交给高级模式处理。
+  const readMultiSubs = () => {
     try {
-      list = JSON.parse(inputs.other || '[]');
-      if (!Array.isArray(list)) list = [];
+      const parsed = JSON.parse(inputs.other || '[]');
+      return Array.isArray(parsed) ? parsed : null;
     } catch (e) {
-      list = [];
+      return null;
     }
-    list.push(tpl);
-    setInputs((prev) => ({ ...prev, other: JSON.stringify(list, null, 2) }));
+  };
+
+  const writeMultiSubs = (list) => {
+    setInputs((prev) => ({
+      ...prev,
+      other: JSON.stringify(list, null, 2),
+    }));
+  };
+
+  const addMultiSubs = () => {
+    const list = readMultiSubs() || [];
+    multiSelected.forEach((t) => {
+      const item = { type: t };
+      (MULTI_SUB_FIELDS[t] || []).forEach((f) => {
+        item[f.name] = '';
+      });
+      list.push(item);
+    });
+    writeMultiSubs(list);
+    setMultiSelected([]);
+  };
+
+  const updateMultiSub = (index, field, value) => {
+    const list = readMultiSubs();
+    if (!list || !list[index]) return;
+    list[index] = { ...list[index], [field]: value };
+    writeMultiSubs(list);
+  };
+
+  const removeMultiSub = (index) => {
+    const list = readMultiSubs();
+    if (!list) return;
+    list.splice(index, 1);
+    writeMultiSubs(list);
+  };
+
+  const moveMultiSub = (index, delta) => {
+    const list = readMultiSubs();
+    if (!list) return;
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return;
+    const [item] = list.splice(index, 1);
+    list.splice(target, 0, item);
+    writeMultiSubs(list);
   };
 
   const loadChannel = async () => {
@@ -113,21 +252,21 @@ const EditChannel = () => {
         try {
           const subs = JSON.parse(localInputs.other);
           if (!Array.isArray(subs) || subs.length === 0) {
-            showError('子渠道配置必须是非空的 JSON 数组');
+            showError('请至少勾选并配置一个推送渠道');
             return;
           }
           for (let i = 0; i < subs.length; i++) {
-            if (!subs[i].type) {
-              showError(`第 ${i + 1} 个子渠道缺少 type`);
+            if (!subs[i] || typeof subs[i] !== 'object' || !subs[i].type) {
+              showError(`第 ${i + 1} 个渠道缺少 type`);
               return;
             }
             if (subs[i].type === 'multi' || subs[i].type === 'group') {
-              showError(`第 ${i + 1} 个子渠道不能是 multi 或 group`);
+              showError(`第 ${i + 1} 个渠道不能是 multi 或 group`);
               return;
             }
           }
         } catch (e) {
-          showError('子渠道配置 JSON 格式错误：' + e.message);
+          showError('渠道配置 JSON 格式错误：' + e.message);
           return;
         }
         break;
@@ -751,45 +890,149 @@ const EditChannel = () => {
             </Form.Group>
           </>
         );
-      case 'multi':
+      case 'multi': {
+        const subs = readMultiSubs();
+        const jsonInvalid = subs === null;
         return (
           <>
             <Message>
-              一个通道对应多个推送渠道。用本通道自己的鉴权令牌调用 /push，即可一次投递到所有子渠道；子渠道用 JSON 数组配置，每项的 type 与单通道一致。某个子渠道失败不影响其余子渠道继续发送。
+              一个通道对应多个推送渠道，仍然只有一个鉴权令牌：在下方<strong>勾选要使用的渠道</strong>并分别填写参数，调用一次
+              /push 即可把同一条消息投递到全部渠道。同一种渠道可以分多次添加（例如两个不同的企业微信群）。某个渠道失败不影响其余渠道继续发送。
             </Message>
-            <Form.Group widths={2}>
-              <Form.Button
-                type='button'
-                content='添加企业微信群机器人'
-                onClick={() =>
-                  appendMultiSub({
-                    type: 'corp',
-                    url: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=替换成你的key',
-                  })
-                }
+            <Form.Group widths='equal'>
+              <Form.Dropdown
+                label='勾选渠道（可多选）'
+                multiple
+                search
+                selection
+                options={MULTI_SUB_OPTIONS}
+                value={multiSelected}
+                onChange={(e, { value }) => setMultiSelected(value)}
+                placeholder='例如：企业微信群机器人 + 中国移动新消息'
               />
               <Form.Button
                 type='button'
-                content='添加中国移动新消息'
-                onClick={() =>
-                  appendMultiSub({
-                    type: 'cmcc',
-                    secret: '替换成你的 API Key',
-                    account_id: '替换成接收人 ID',
-                  })
-                }
+                content='添加选中的渠道'
+                primary
+                disabled={multiSelected.length === 0}
+                onClick={addMultiSubs}
               />
             </Form.Group>
-            <Form.TextArea
-              label='子渠道配置（JSON 数组）'
-              name='other'
-              value={inputs.other}
-              onChange={handleInputChange}
-              placeholder='[{"type":"corp","url":"..."},{"type":"cmcc","secret":"...","account_id":"..."}]'
-              style={{ minHeight: 220, fontFamily: 'JetBrains Mono, Consolas' }}
+            {jsonInvalid ? (
+              <Message negative>
+                当前渠道配置不是合法的 JSON 数组，请勾选「高级：直接编辑
+                JSON」修正，或
+                <Button
+                  type='button'
+                  size='mini'
+                  onClick={() => writeMultiSubs([])}
+                  content='重置为空'
+                />
+                重新勾选。
+              </Message>
+            ) : (
+              <>
+                {subs.length === 0 && (
+                  <Message info>还没有添加任何渠道，请在上方勾选后点击「添加选中的渠道」。</Message>
+                )}
+                {subs.map((sub, idx) => (
+                  <Segment key={idx} secondary>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Header as='h5' style={{ margin: 0 }}>
+                        渠道 {idx + 1}：{multiSubLabel(sub && sub.type)}
+                      </Header>
+                      <Button.Group size='mini'>
+                        <Button
+                          type='button'
+                          icon='arrow up'
+                          disabled={idx === 0}
+                          onClick={() => moveMultiSub(idx, -1)}
+                          title='上移'
+                        />
+                        <Button
+                          type='button'
+                          icon='arrow down'
+                          disabled={idx === subs.length - 1}
+                          onClick={() => moveMultiSub(idx, 1)}
+                          title='下移'
+                        />
+                        <Button
+                          type='button'
+                          icon='trash'
+                          color='red'
+                          onClick={() => removeMultiSub(idx)}
+                          title='删除'
+                        />
+                      </Button.Group>
+                    </div>
+                    <Form.Select
+                      label='渠道类型'
+                      options={MULTI_SUB_OPTIONS}
+                      value={(sub && sub.type) || ''}
+                      onChange={(e, { value }) =>
+                        updateMultiSub(idx, 'type', value)
+                      }
+                    />
+                    {(MULTI_SUB_FIELDS[(sub && sub.type) || ''] || []).map((f) =>
+                      f.textarea ? (
+                        <Form.TextArea
+                          key={f.name}
+                          label={f.label}
+                          name={`multi_${idx}_${f.name}`}
+                          value={(sub && sub[f.name]) || ''}
+                          placeholder={f.placeholder}
+                          onChange={(e, { value }) =>
+                            updateMultiSub(idx, f.name, value)
+                          }
+                          style={{
+                            minHeight: 100,
+                            fontFamily: 'JetBrains Mono, Consolas',
+                          }}
+                        />
+                      ) : (
+                        <Form.Input
+                          key={f.name}
+                          label={f.label}
+                          name={`multi_${idx}_${f.name}`}
+                          type={f.password ? 'password' : 'text'}
+                          autoComplete='new-password'
+                          value={(sub && sub[f.name]) || ''}
+                          placeholder={f.placeholder}
+                          onChange={(e, { value }) =>
+                            updateMultiSub(idx, f.name, value)
+                          }
+                        />
+                      )
+                    )}
+                  </Segment>
+                ))}
+              </>
+            )}
+            <Form.Checkbox
+              label='高级：直接编辑 JSON 配置'
+              checked={showMultiJson}
+              onChange={() => setShowMultiJson(!showMultiJson)}
             />
+            {showMultiJson && (
+              <Form.TextArea
+                label='渠道配置（JSON 数组）'
+                name='other'
+                value={inputs.other}
+                onChange={handleInputChange}
+                placeholder='[{"type":"corp","url":"..."},{"type":"cmcc","secret":"...","account_id":"..."}]'
+                style={{ minHeight: 200, fontFamily: 'JetBrains Mono, Consolas' }}
+              />
+            )}
           </>
         );
+      }
       case 'none':
         return (
           <>

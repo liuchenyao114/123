@@ -35,14 +35,14 @@ func (s multiSubChannel) toChannel() *model.Channel {
 func parseMultiSubChannels(raw string) ([]*model.Channel, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, errors.New("多通道配置为空，请在「子渠道配置」中填写 JSON 数组")
+		return nil, errors.New("渠道配置为空，请在通道配置中勾选并填写至少一个渠道")
 	}
 	var subs []multiSubChannel
 	if err := json.Unmarshal([]byte(raw), &subs); err != nil {
-		return nil, fmt.Errorf("多通道配置必须是合法的 JSON 数组：%w", err)
+		return nil, fmt.Errorf("渠道配置必须是合法的 JSON 数组：%w", err)
 	}
 	if len(subs) == 0 {
-		return nil, errors.New("多通道配置至少需要一个子渠道")
+		return nil, errors.New("至少需要一个推送渠道")
 	}
 	channels := make([]*model.Channel, 0, len(subs))
 	for i, s := range subs {
