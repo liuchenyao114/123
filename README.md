@@ -42,8 +42,8 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
 
 ```bash
 # 从 Releases 下载对应平台的二进制（Linux amd64 示例）
-chmod +x message-pusher-cmcc-linux-amd64
-./message-pusher-cmcc-linux-amd64 --port 3000
+chmod +x message-pusher-linux-amd64
+./message-pusher-linux-amd64 --port 3000
 ```
 
 浏览器打开 `http://<服务器IP>:3000`，用 `root` / `123456` 登录后**立即修改密码**，再到「通道」页新建通道、在「推送设置」里设置全局令牌。默认使用 SQLite，二进制静态链接，无需安装 Go、Node 或数据库。

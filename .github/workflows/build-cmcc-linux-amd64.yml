@@ -78,13 +78,13 @@ jobs:
           go mod download
           go build -trimpath \
             -ldflags "-s -w -X 'message-pusher/common.Version=${{ steps.ver.outputs.value }}' -extldflags '-static'" \
-            -o message-pusher-cmcc-linux-amd64 .
-          file message-pusher-cmcc-linux-amd64
+            -o message-pusher-linux-amd64 .
+          file message-pusher-linux-amd64
 
       - name: Smoke test (verify SQLite actually usable)
         run: |
-          ./message-pusher-cmcc-linux-amd64 --version || true
-          timeout 12s ./message-pusher-cmcc-linux-amd64 --port 3999 > /tmp/mp.log 2>&1 || true
+          ./message-pusher-linux-amd64 --version || true
+          timeout 12s ./message-pusher-linux-amd64 --port 3999 > /tmp/mp.log 2>&1 || true
           tail -20 /tmp/mp.log
           if grep -q 'CGO_ENABLED=0\|requires cgo' /tmp/mp.log; then
             echo '::error::SQLite 驱动是 stub，构建未启用 cgo'
@@ -94,6 +94,6 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: message-pusher-cmcc-linux-amd64
-          path: message-pusher-cmcc-linux-amd64
+          name: message-pusher-linux-amd64
+          path: message-pusher-linux-amd64
           if-no-files-found: error
