@@ -1,0 +1,21 @@
+# Render Blueprint — 免费 Web Service（临时演示 / 快速体验）
+# 用法：Render 控制台 → Blueprints → New Blueprint Instance → 连接本仓库
+# 注意：免费层会休眠且没有持久磁盘，正式部署请用 DEPLOY.md 里的方案 A。
+services:
+  - type: web
+    name: message-pusher
+    runtime: docker
+    plan: free
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: '10000'
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SQLITE_PATH
+        value: /data/message-pusher.db
+      - key: TZ
+        value: Asia/Shanghai
+      - key: SQL_DSN
+        sync: false
