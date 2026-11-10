@@ -21,7 +21,7 @@ type Webhook struct {
 	CreatedTime   int64  `json:"created_time" gorm:"bigint"`
 	ExtractRule   string `json:"extract_rule" gorm:"not null"`              // how we extract key info from the request
 	ConstructRule string `json:"construct_rule" gorm:"not null"`            // how we construct message with the extracted info
-	Channel       string `json:"channel" gorm:"type:varchar(32); not null"` // which channel to send our message
+	Channel       string `json:"channel" gorm:"type:varchar(1024); not null"` // 支持多个通道，用 | 分隔
 }
 
 func GetWebhookById(id int, userId int) (*Webhook, error) {

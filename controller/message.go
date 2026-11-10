@@ -133,6 +133,23 @@ func authMessage(messageToken string, userToken string, channelToken *string) bo
 	return true
 }
 
+// splitChannelNames 把 a|b 形式的多通道配置拆成去重后的通道名列表。
+// 只写了一个通道时返回单元素，保持原有行为完全不变。
+func splitChannelNames(raw string) []string {
+	parts := strings.Split(raw, "|")
+	seen := make(map[string]bool, len(parts))
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	return names
+}
+
 func processMessage(c *gin.Context, message *model.Message, user *model.User, needAuth bool) {
 	if message.Title == "" {
 		message.Title = common.SystemName
@@ -143,6 +160,19 @@ func processMessage(c *gin.Context, message *model.Message, user *model.User, ne
 			message.Channel = model.TypeEmail
 		}
 	}
+	channelNames := splitChannelNames(message.Channel)
+	if len(channelNames) > 1 {
+		processMultiChannelMessage(c, message, user, needAuth, channelNames)
+		return
+	}
+	if len(channelNames) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "无效的渠道名称：" + message.Channel,
+		})
+		return
+	}
+	message.Channel = channelNames[0]
 	channel_, err := model.GetChannelByName(message.Channel, user.Id)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -183,6 +213,52 @@ func processMessage(c *gin.Context, message *model.Message, user *model.User, ne
 		"message": "",
 		"uuid":    message.Link,
 	})
+}
+
+// processMultiChannelMessage 把同一条消息依次投递到多个通道。
+// 每个通道独立鉴权、独立生成消息记录；某个通道失败不影响其余通道。
+func processMultiChannelMessage(c *gin.Context, message *model.Message, user *model.User, needAuth bool, names []string) {
+	uuids := make([]string, 0, len(names))
+	failures := make([]string, 0)
+	for _, name := range names {
+		cloned := *message
+		cloned.Channel = name
+		cloned.Link = ""
+		channel_, err := model.GetChannelByName(name, user.Id)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s：无效的渠道名称", name))
+			continue
+		}
+		if needAuth && !authMessage(cloned.Token, user.Token, channel_.Token) {
+			failures = append(failures, fmt.Sprintf("%s：鉴权失败，请提供全局令牌或该通道的令牌", name))
+			continue
+		}
+		if cloned.RenderMode == "code" && cloned.Content != "" {
+			cloned.Content = fmt.Sprintf("```\n%s\n```", cloned.Content)
+		}
+		if err = saveAndSendMessage(user, &cloned, channel_); err != nil {
+			failures = append(failures, fmt.Sprintf("%s：%s", name, err.Error()))
+			continue
+		}
+		uuids = append(uuids, cloned.Link)
+	}
+	if len(uuids) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "所有渠道推送失败：" + strings.Join(failures, "；"),
+		})
+		return
+	}
+	resp := gin.H{
+		"success": true,
+		"message": "",
+		"uuid":    uuids[0],
+		"uuids":   uuids,
+	}
+	if len(failures) > 0 {
+		resp["message"] = "部分渠道推送失败：" + strings.Join(failures, "；")
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func saveAndSendMessage(user *model.User, message *model.Message, channel_ *model.Channel) error {

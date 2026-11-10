@@ -24,7 +24,7 @@ const EditWebhook = () => {
       '  "content": "内容：$content",\n' +
       '  "url": "https://example.com/$title"\n' +
       '}',
-    channel: 'default',
+    channel: ['default'],
   };
 
   const [inputs, setInputs] = useState(originInputs);
@@ -35,12 +35,30 @@ const EditWebhook = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   };
 
+  // 「默认通道」与具体通道互斥；其余通道可以任意多选。
+  const handleChannelChange = (e, { value }) => {
+    let next = Array.isArray(value) ? value : value ? [value] : [];
+    if (next.includes('default') && next.length > 1) {
+      next = channel.includes('default')
+        ? next.filter((v) => v !== 'default')
+        : ['default'];
+    }
+    setInputs((prev) => ({ ...prev, channel: next }));
+  };
+
   const loadWebhook = async () => {
     let res = await API.get(`/api/webhook/${webhookId}`);
     const { success, message, data } = res.data;
     if (success) {
-      if (data.channel === '') {
-        data.channel = 'default';
+      const raw = data.channel;
+      if (raw === '' || raw === undefined || raw === null) {
+        data.channel = ['default'];
+      } else {
+        const list = String(raw)
+          .split('|')
+          .map((v) => v.trim())
+          .filter(Boolean);
+        data.channel = list.length > 0 ? list : ['default'];
       }
       setInputs(data);
     } else {
@@ -80,9 +98,15 @@ const EditWebhook = () => {
     }
     let res = undefined;
     let localInputs = { ...inputs };
-    if (localInputs.channel === 'default') {
-      localInputs.channel = '';
-    }
+    const selectedChannels = Array.isArray(localInputs.channel)
+      ? localInputs.channel
+      : String(localInputs.channel || '')
+          .split('|')
+          .filter(Boolean);
+    // 选了「默认通道」或什么都没选，都回落到账号默认通道（空串）。
+    localInputs.channel = selectedChannels.includes('default')
+      ? ''
+      : selectedChannels.join('|');
     if (isEditing) {
       res = await API.put(`/api/webhook/`, {
         ...localInputs,
@@ -95,6 +119,8 @@ const EditWebhook = () => {
     if (success) {
       if (isEditing) {
         showSuccess('接口信息更新成功！');
+        // 回读服务端实际保存的值，避免界面与数据库不一致
+        await loadWebhook();
       } else {
         showSuccess('接口创建成功！');
         setInputs(originInputs);
@@ -120,18 +146,28 @@ const EditWebhook = () => {
             />
           </Form.Field>
           <Form.Field>
-            <Form.Select
-              label='通道'
+            <Form.Dropdown
+              label='通道（可多选）'
               name='channel'
-              type={'text'}
+              multiple
+              search
+              selection
               options={channels}
-              placeholder={'请选择消息通道'}
-              onChange={handleInputChange}
+              placeholder={'可选择一个或多个消息通道'}
+              onChange={handleChannelChange}
               value={channel}
               autoComplete='new-password'
-              required
             />
           </Form.Field>
+          <div style={{ marginTop: -8, marginBottom: 12, color: '#666' }}>
+            已选择 {Array.isArray(channel) ? channel.length : 0} 个通道：
+            {Array.isArray(channel) && channel.length > 0
+              ? channel.join('、')
+              : '默认通道'}
+          </div>
+          <Message info>
+            选择多个通道后，一次请求会把同一条消息分别投递到每个通道，其中某个通道失败不影响其余通道。选「默认通道」则使用账号的默认通道，且不能与其他通道同时选中。多通道推送请使用<strong>全局鉴权令牌</strong>：「一通道一码」下单个通道的推送码只对该通道有效。
+          </Message>
           <Message>
             如果你不知道如何写提取规则和构建规则，请看
             <a
