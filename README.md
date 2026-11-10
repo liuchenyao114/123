@@ -28,7 +28,7 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
 
 ## 本仓库简介
 
-本仓库是 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) 的定制分支，基于上游 `master` 提交 `fbbfa58`（2025-11-22，`git describe --tags` = `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新）。属于**非官方实现**，与中国移动无隶属关系。
+本仓库是 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) 的定制分支，基于上游 `master` 提交 `fbbfa58`（2025-11-22，`git describe --tags` = `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新）。属于**非官方实现**，与中国移动无隶属关系。当前正式版本为 `v0.5.1`，各平台二进制见 [Releases](https://github.com/liuchenyao114/123/releases/latest)。
 
 | 相对上游的变化 | 说明 |
 | --- | --- |

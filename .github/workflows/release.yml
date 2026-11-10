@@ -12,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '发布版本号，例如 v0.4.13-cmcc.1'
+        description: '发布版本号，例如 v0.5.1'
         required: true
-        default: 'v0.4.13-cmcc.1'
+        default: 'v0.5.1'
 
 permissions:
   contents: write
