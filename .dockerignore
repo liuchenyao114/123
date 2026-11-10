@@ -1,0 +1,15 @@
+.git
+.github
+web/node_modules
+web/build
+data
+logs
+*.exe
+*.db
+*.log
+*.zip
+*.tar.gz
+.toolchain
+.npm-cache-local
+.tmp-sync
+.tmp-fix

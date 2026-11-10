@@ -51,16 +51,21 @@ const EditWebhook = () => {
     const { success, message, data } = res.data;
     if (success) {
       const raw = data.channel;
-      if (raw === '' || raw === undefined || raw === null) {
-        data.channel = ['default'];
-      } else {
-        const list = String(raw)
+      let list = [];
+      if (raw !== '' && raw !== undefined && raw !== null) {
+        list = String(raw)
           .split('|')
           .map((v) => v.trim())
           .filter(Boolean);
-        data.channel = list.length > 0 ? list : ['default'];
       }
-      setInputs(data);
+      // 只取表单需要的字段，避免把 id / user_id / status / link 等带回提交
+      setInputs((prev) => ({
+        ...prev,
+        name: data.name || '',
+        extract_rule: data.extract_rule || '',
+        construct_rule: data.construct_rule || '',
+        channel: list.length > 0 ? list : ['default'],
+      }));
     } else {
       showError(message);
     }
@@ -102,6 +107,7 @@ const EditWebhook = () => {
       ? localInputs.channel
       : String(localInputs.channel || '')
           .split('|')
+          .map((v) => v.trim())
           .filter(Boolean);
     // 选了「默认通道」或什么都没选，都回落到账号默认通道（空串）。
     localInputs.channel = selectedChannels.includes('default')

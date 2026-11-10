@@ -10,47 +10,68 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
 
 </div>
 
-<p align="center">
-  <a href="https://raw.githubusercontent.com/songquanpeng/message-pusher/main/LICENSE">
-    <img src="https://img.shields.io/github/license/songquanpeng/message-pusher?color=brightgreen" alt="license">
-  </a>
-  <a href="https://github.com/songquanpeng/message-pusher/releases/latest">
-    <img src="https://img.shields.io/github/v/release/songquanpeng/message-pusher?color=brightgreen&include_prereleases" alt="release">
-  </a>
-  <a href="https://hub.docker.com/repository/docker/justsong/message-pusher">
-    <img src="https://img.shields.io/docker/pulls/justsong/message-pusher?color=brightgreen" alt="docker pull">
-  </a>
-  <a href="https://github.com/songquanpeng/message-pusher/releases/latest">
-    <img src="https://img.shields.io/github/downloads/songquanpeng/message-pusher/total?color=brightgreen&include_prereleases" alt="release">
-  </a>
-  <a href="https://goreportcard.com/report/github.com/songquanpeng/message-pusher">
-    <img src="https://goreportcard.com/badge/github.com/songquanpeng/message-pusher" alt="GoReportCard">
-  </a>
-</p>
+<p align="center">基于 <a href="https://github.com/songquanpeng/message-pusher">songquanpeng/message-pusher</a> 定制 · MIT 协议</p>
 
 <p align="center">
-  <a href="https://github.com/songquanpeng/message-pusher/releases">程序下载</a>
+  <a href="https://github.com/liuchenyao114/123/releases/latest">程序下载</a>
   ·
-  <a href="#部署">部署教程</a>
+  <a href="#快速开始">快速开始</a>
   ·
   <a href="#用法">使用教程</a>
   ·
-  <a href="https://github.com/songquanpeng/message-pusher/issues">意见反馈</a>
+  <a href="#中国移动新消息通道">CMCC 通道</a>
   ·
-  <a href="https://push.justsong.cn">在线演示</a>
+  <a href="#部署">部署教程</a>
+  ·
+  <a href="https://github.com/liuchenyao114/123/issues">意见反馈</a>
 </p>
 
-> **Fork 说明**：本仓库基于 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) `master` 分支提交 `fbbfa58`（2025-11-22，`git describe --tags` 为 `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新），新增**中国移动新消息（5G 消息 / ClawBot）**原生 Go 推送通道 `cmcc`，协议参考 [x-dr/cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)。属于非官方实现，与中国移动无隶属关系。
->
-> - 通道实现：`channel/cmcc.go`，配置方法见[中国移动新消息通道](#中国移动新消息通道)
-> - 编译：`.github/workflows/build-cmcc-linux-amd64.yml` 支持 push 到 `main` 自动触发与手动触发，CI 每次从源码构建前端并产出带 SQLite 的 Linux amd64 静态二进制；仓库另附带 `web/build`，便于离线 `go build`
-> - 诊断工具：`go build ./cmd/cmcc-probe` 生成独立的链路测试程序
-> - `VERSION` = `v0.4.13-alpha-4-gfbbfa58+cmcc`，随仓库提供（上游 CI 用 `git describe --tags` 现场生成，源码仓库原本没有该文件）
-> - `docker-compose.cmcc.yml` 基于本地源码构建，官方镜像不含本通道
+## 本仓库简介
+
+本仓库是 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) 的定制分支，基于上游 `master` 提交 `fbbfa58`（2025-11-22，`git describe --tags` = `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新）。属于**非官方实现**，与中国移动无隶属关系。
+
+| 相对上游的变化 | 说明 |
+| --- | --- |
+| ➕ 新增 `cmcc` 通道 | Go 原生 WebSocket 对接中国移动「新消息 ClawBot / 5G 消息」，无需额外网关或 Cloudflare Worker；协议参考 [x-dr/cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)，实现见 `channel/cmcc.go` |
+| ➕ 接口可选多个通道 | 「接口配置（Webhook）」页的通道下拉可多选，一次请求把同一条消息分别投递到所有选中通道，失败互不拖累；`/push` 也支持 `channel=a|b` |
+| ➖ 移除 `tencent_alarm` | 腾讯云自定义告警/短信通道的代码、界面与文档全部删除 |
+| 🔧 构建与发布 | push `main` 自动重建前端 + 跑单元测试 + 编译 linux/amd64；打 tag 或手动触发 `Release (multi-platform)` 自动发布 4 个平台的正式 Release |
+| 🔧 附带文件 | `VERSION`、`docker-compose.cmcc.yml`、`cmd/cmcc-probe` 链路诊断工具、channel/controller 单元测试 |
+
+### 快速开始
+
+```bash
+# 从 Releases 下载对应平台的二进制（Linux amd64 示例）
+chmod +x message-pusher-cmcc-linux-amd64
+./message-pusher-cmcc-linux-amd64 --port 3000
+```
+
+浏览器打开 `http://<服务器IP>:3000`，用 `root` / `123456` 登录后**立即修改密码**，再到「通道」页新建通道、在「推送设置」里设置全局令牌。默认使用 SQLite，二进制静态链接，无需安装 Go、Node 或数据库。
+
+> 二进制内嵌了 Web 前端，服务器升级时必须**替换整个可执行文件并重启**；只改配置文件不会更新界面。
+
+### 构建与发布
+
+全部在 GitHub Actions 上完成，本地不需要 Go / Node 环境：
+
+| 触发 | 工作流 | 产物 |
+| --- | --- | --- |
+| push 到 `main` | `build-cmcc-linux-amd64.yml` | 从源码重建前端 → 单元测试 → 编译带 SQLite 的 linux/amd64 静态二进制，上传 Actions Artifact |
+| 打 `v*` tag 或手动触发 | `release.yml` | linux amd64/arm64、windows amd64、macOS arm64，自动发布正式 Release |
+
+仓库内附带的 `web/build` 仅供离线 `go build`（`go:embed` 需要它），**可能落后于源码**；CI 每次都会从源码重建前端，请以 Actions 产物为准。上游的 3 个 release 与 2 个 Docker 工作流已改为仅手动触发（推送镜像需配置 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`）。
+
+### 安全提示
+
+- 首次登录后立即修改默认密码 `root` / `123456`；对外开放时关闭注册、设置推送令牌并启用 HTTPS
+- API Key 与推送令牌存在数据库中，不要写进日志或提交到仓库
+- `cmcc` 为非官方实现，需号码/终端支持 ClawBot 并自行申请 API Key；写入 WebSocket 成功不代表手机已送达；建议单实例部署
 
 > **Warning**：原域名（msgpusher.com）将于 2026-11-24 下线，请尽快迁移至 https://push.justsong.cn
-
-> **Warning**：从 `v0.3` 版本升级到 `v0.4` 版本需要手动迁移数据库，具体方法见[迁移数据库](#迁移数据库)。
+>
+> **Warning**：从 `v0.3` 升级到 `v0.4` 需要手动迁移数据库，见[迁移数据库](#迁移数据库)。
+>
+> **Warning**：老数据库若残留 `type='tencent_alarm'` 的通道记录，执行 `DELETE FROM channels WHERE type = 'tencent_alarm';` 清理，否则推送到它会返回「不支持的消息通道」。
 
 ## 描述
 1. **多种消息推送方式**：
@@ -67,7 +88,7 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
    + Telegram 机器人，
    + Discord 群机器人，
    + 中国移动新消息（5G 消息 / ClawBot）：推送到手机「新消息」应用号，
-   + **群组消息**：可以将多个推送通道组合成一个群组，然后向群组发送消息，可以实现一次性推送到多个渠道的功能，
+   + **群组消息**：预先把多个通道组合成群组，推送时指定群组名即可一次发到多个渠道（与[接口多选](#一次推送到多个通道)是两种不同的方式），
    + **自定义消息**：可以自定义消息请求 URL 和请求体格式，实现与其他服务的对接，支持[众多第三方服务](https://iamazing.cn/page/message-pusher-common-custom-templates)。
 2. 支持**自定义 Webhook，反向适配各种调用平台**，你可以接入各种已有的系统，而无需修改其代码。
 3. 支持在 Web 端编辑 & 管理发送的消息，新消息发送后 Web 端**即时刷新**。
@@ -218,7 +239,7 @@ proxy_send_timeout 300s;
       9. `client`：通过 WebSocket 客户端进行推送（支持 `title` 和 `description` 字段）。
       10. `telegram`：通过 Telegram 机器人进行推送（`description` 或 `content` 字段二选一，支持 Markdown 的子集）。
       11. `discord`：通过 Discord 群机器人进行推送（注意事项同上）。
-      12. `one_api`：通过 OneAPI 协议推送消息到 QQ。
+      12. `one_bot`：通过 OneBot 协议推送消息到 QQ。
       13. `group`：通过预先配置的消息推送通道群组进行推送。
       14. `custom`：通过预先配置好的自定义推送通道进行推送。
       15. `none`：仅保存到数据库，不做推送。
@@ -252,9 +273,9 @@ curl "http://127.0.0.1:3000/push/root?title=告警&description=磁盘90%&channel
 说明：
 1. 每个通道独立鉴权、独立生成一条消息记录；响应中 `uuid` 是第一个通道的消息 UUID，`uuids` 是全部 UUID 数组。
 2. 某个通道失败（名称不存在、被禁用、发送报错）不影响其余通道；全部失败才返回 `success: false`，部分失败时 `message` 会列出失败原因。
-3. **鉴权（只针对直接调用 `/push` 接口；Webhook 由服务内部触发，不需要 token）**：每个通道可以有自己的推送码，这个码只对它自己有效。一次推多个通道时，请用「推送设置」里的**全局鉴权令牌**（对所有通道都有效）；如果只带某个通道的码，其余通道会被跳过。
+3. **鉴权（只针对直接调用 `/push` 接口；Webhook 由服务内部触发，不需要 token）**：每个通道可以有自己的推送码，这个码只对它自己有效。一次推多个通道时请用「推送设置」里的**全局鉴权令牌**（对所有通道都有效）；如果只带某个通道的码，其他设了独立令牌的通道会被跳过；账号设了全局令牌后，未设独立令牌的通道也必须带全局令牌。
 4. Webhook 下拉中的「默认通道」与其他通道互斥，选中它会清空其余选择；留空等同于使用账号默认通道。
-5. 老版本数据库若 `webhooks.channel` 仍是 `varchar(32)`（MySQL），多选后可能超长，请执行 `ALTER TABLE webhooks MODIFY channel VARCHAR(1024) NOT NULL;`；SQLite 不限制长度，无需处理。
+5. `webhooks.channel` 已扩为 `varchar(1024)`：MySQL 由 GORM AutoMigrate 自动改列（需数据库账号具备 ALTER 权限；否则手工执行 `ALTER TABLE webhooks MODIFY channel VARCHAR(1024) NOT NULL;`），SQLite 不限制长度，无需处理。
 
 
 **各种通道的支持程度：**
@@ -273,6 +294,10 @@ curl "http://127.0.0.1:3000/push/root?title=告警&description=磁盘90%&channel
 |   `telegram`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ✅      |
 |    `discord`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ❌      |
 |     `cmcc`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ❌      |
+|    `one_bot`    |    ✅    |       ✅       |     ✅     |   ❌   |  ✅   |      ❌      |
+|    `custom`     |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |  取决于模板  |
+|     `group`     |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |  取决于子通道  |
+|     `none`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ✅      |
 
 注意：
 1. 对于大部分通道，`description` 字段和 `content` 是不能同时存在的，如果你只需要文字消息，请使用 `description` 字段，如果你需要发送 Markdown 消息，请使用 `content` 字段。

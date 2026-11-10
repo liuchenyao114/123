@@ -120,17 +120,17 @@ func pushMessageHelper(c *gin.Context, message *model.Message) {
 }
 
 func authMessage(messageToken string, userToken string, channelToken *string) bool {
-	if userToken != "" {
-		if messageToken == userToken {
-			return true
-		}
+	// 全局令牌匹配，对所有通道都放行
+	if userToken != "" && messageToken == userToken {
+		return true
 	}
+	// 通道单独设置了令牌时，必须严格匹配该令牌
 	if channelToken != nil && *channelToken != "" {
-		if messageToken != *channelToken {
-			return false
-		}
+		return messageToken == *channelToken
 	}
-	return true
+	// 只有账号和通道都没设置令牌时才允许匿名推送。
+	// 设了全局令牌而通道未设令牌时，不能再无条件放行（否则全局令牌形同虚设）。
+	return userToken == ""
 }
 
 // splitChannelNames 把 a|b 形式的多通道配置拆成去重后的通道名列表。
@@ -220,6 +220,7 @@ func processMessage(c *gin.Context, message *model.Message, user *model.User, ne
 func processMultiChannelMessage(c *gin.Context, message *model.Message, user *model.User, needAuth bool, names []string) {
 	uuids := make([]string, 0, len(names))
 	failures := make([]string, 0)
+	results := make([]gin.H, 0, len(names))
 	for _, name := range names {
 		cloned := *message
 		cloned.Channel = name
@@ -227,10 +228,12 @@ func processMultiChannelMessage(c *gin.Context, message *model.Message, user *mo
 		channel_, err := model.GetChannelByName(name, user.Id)
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s：无效的渠道名称", name))
+			results = append(results, gin.H{"channel": name, "error": "无效的渠道名称"})
 			continue
 		}
 		if needAuth && !authMessage(cloned.Token, user.Token, channel_.Token) {
 			failures = append(failures, fmt.Sprintf("%s：鉴权失败，请提供全局令牌或该通道的令牌", name))
+			results = append(results, gin.H{"channel": name, "error": "鉴权失败"})
 			continue
 		}
 		if cloned.RenderMode == "code" && cloned.Content != "" {
@@ -238,14 +241,17 @@ func processMultiChannelMessage(c *gin.Context, message *model.Message, user *mo
 		}
 		if err = saveAndSendMessage(user, &cloned, channel_); err != nil {
 			failures = append(failures, fmt.Sprintf("%s：%s", name, err.Error()))
+			results = append(results, gin.H{"channel": name, "error": err.Error()})
 			continue
 		}
 		uuids = append(uuids, cloned.Link)
+		results = append(results, gin.H{"channel": name, "uuid": cloned.Link})
 	}
 	if len(uuids) == 0 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "所有渠道推送失败：" + strings.Join(failures, "；"),
+			"results": results,
 		})
 		return
 	}
@@ -254,6 +260,7 @@ func processMultiChannelMessage(c *gin.Context, message *model.Message, user *mo
 		"message": "",
 		"uuid":    uuids[0],
 		"uuids":   uuids,
+		"results": results,
 	}
 	if len(failures) > 0 {
 		resp["message"] = "部分渠道推送失败：" + strings.Join(failures, "；")

@@ -59,6 +59,16 @@ jobs:
           go-version: '1.22'
           cache: true
 
+      - name: Run unit tests
+        run: |
+          # common/init.go 在 init() 里调用了 flag.Parse()，直接 `go test ./...` 会被
+          # go test 注入的 -test.* 参数打断。改为先编译测试二进制，再不带参数运行。
+          go mod download
+          go test -c -o /tmp/channel.test ./channel
+          /tmp/channel.test
+          go test -c -o /tmp/controller.test ./controller
+          /tmp/controller.test
+
       - name: Build backend (CGO enabled, static, SQLite works)
         env:
           CGO_ENABLED: '1'
