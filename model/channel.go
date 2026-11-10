@@ -22,6 +22,7 @@ const (
 	TypeLarkApp           = "lark_app"
 	TypeCustom            = "custom"
 	TypeCmcc              = "cmcc"
+	TypeMulti             = "multi"
 )
 
 type Channel struct {

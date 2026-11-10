@@ -60,6 +60,12 @@ export const CHANNEL_OPTIONS = [
     color: '#e60012',
   },
   {
+    key: 'multi',
+    text: '多通道组合',
+    value: 'multi',
+    color: '#6f42c1',
+  },
+  {
     key: 'none',
     text: '不推送',
     value: 'none',

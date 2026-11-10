@@ -32,6 +32,18 @@ const EditChannel = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   };
 
+  const appendMultiSub = (tpl) => {
+    let list = [];
+    try {
+      list = JSON.parse(inputs.other || '[]');
+      if (!Array.isArray(list)) list = [];
+    } catch (e) {
+      list = [];
+    }
+    list.push(tpl);
+    setInputs((prev) => ({ ...prev, other: JSON.stringify(list, null, 2) }));
+  };
+
   const loadChannel = async () => {
     let res = await API.get(`/api/channel/${channelId}`);
     const { success, message, data } = res.data;
@@ -94,6 +106,28 @@ const EditChannel = () => {
           JSON.parse(localInputs.other);
         } catch (e) {
           showError('JSON 格式错误：' + e.message);
+          return;
+        }
+        break;
+      case 'multi':
+        try {
+          const subs = JSON.parse(localInputs.other);
+          if (!Array.isArray(subs) || subs.length === 0) {
+            showError('子渠道配置必须是非空的 JSON 数组');
+            return;
+          }
+          for (let i = 0; i < subs.length; i++) {
+            if (!subs[i].type) {
+              showError(`第 ${i + 1} 个子渠道缺少 type`);
+              return;
+            }
+            if (subs[i].type === 'multi' || subs[i].type === 'group') {
+              showError(`第 ${i + 1} 个子渠道不能是 multi 或 group`);
+              return;
+            }
+          }
+        } catch (e) {
+          showError('子渠道配置 JSON 格式错误：' + e.message);
           return;
         }
         break;
@@ -715,6 +749,45 @@ const EditChannel = () => {
                 placeholder='选填，收到入站消息时 POST 转发到该地址'
               />
             </Form.Group>
+          </>
+        );
+      case 'multi':
+        return (
+          <>
+            <Message>
+              一个通道对应多个推送渠道。用本通道自己的鉴权令牌调用 /push，即可一次投递到所有子渠道；子渠道用 JSON 数组配置，每项的 type 与单通道一致。某个子渠道失败不影响其余子渠道继续发送。
+            </Message>
+            <Form.Group widths={2}>
+              <Form.Button
+                type='button'
+                content='添加企业微信群机器人'
+                onClick={() =>
+                  appendMultiSub({
+                    type: 'corp',
+                    url: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=替换成你的key',
+                  })
+                }
+              />
+              <Form.Button
+                type='button'
+                content='添加中国移动新消息'
+                onClick={() =>
+                  appendMultiSub({
+                    type: 'cmcc',
+                    secret: '替换成你的 API Key',
+                    account_id: '替换成接收人 ID',
+                  })
+                }
+              />
+            </Form.Group>
+            <Form.TextArea
+              label='子渠道配置（JSON 数组）'
+              name='other'
+              value={inputs.other}
+              onChange={handleInputChange}
+              placeholder='[{"type":"corp","url":"..."},{"type":"cmcc","secret":"...","account_id":"..."}]'
+              style={{ minHeight: 220, fontFamily: 'JetBrains Mono, Consolas' }}
+            />
           </>
         );
       case 'none':
