@@ -44,14 +44,19 @@ function App() {
       statusDispatch({ type: 'set', payload: data });
       localStorage.setItem('footer_html', data.footer_html);
       localStorage.setItem('home_page_link', data.home_page_link);
-      if (
-        data.version !== process.env.REACT_APP_VERSION &&
-        data.version !== 'v0.0.0' &&
-        process.env.REACT_APP_VERSION !== ''
-      ) {
-        showNotice(
-          `新版本可用：${data.version}，请使用快捷键 Shift + F5 刷新页面`
-        );
+      // 后端版本是唯一真源。只在「本地记录的版本」与服务端版本不一致时
+      // 提示一次，并立即写入新版本，避免浏览器缓存旧前端时每次刷新都弹窗。
+      // 原实现拿构建时注入的 REACT_APP_VERSION 与服务端比较，一旦两者不一致
+      // 就会永久误报「新版本可用」。
+      const localVersion = localStorage.getItem('app_version');
+      const serverVersion = data.version || '';
+      if (serverVersion && serverVersion !== 'v0.0.0') {
+        if (localVersion && localVersion !== serverVersion) {
+          showNotice(
+            `新版本可用：${serverVersion}，请使用快捷键 Shift + F5 刷新页面`
+          );
+        }
+        localStorage.setItem('app_version', serverVersion);
       }
     } else {
       showError('无法正常连接至服务器！');

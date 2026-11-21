@@ -74,22 +74,37 @@ const OtherSetting = () => {
 
   const openGitHubRelease = () => {
     window.location =
-      'https://github.com/songquanpeng/message-pusher/releases/latest';
+      'https://github.com/liuchenyao114/123/releases/latest';
+  };
+
+  // 当前版本取服务端 /api/status，而不是构建时注入的 REACT_APP_VERSION，
+  // 避免「已是最新版本」判断与系统信息里的版本不一致。
+  const getCurrentVersion = () => {
+    try {
+      const savedStatus = JSON.parse(localStorage.getItem('status') || '{}');
+      return savedStatus.version || process.env.REACT_APP_VERSION || '';
+    } catch (e) {
+      return process.env.REACT_APP_VERSION || '';
+    }
   };
 
   const checkUpdate = async () => {
-    const res = await API.get(
-      'https://api.github.com/repos/songquanpeng/message-pusher/releases/latest'
-    );
-    const { tag_name, body } = res.data;
-    if (tag_name === process.env.REACT_APP_VERSION) {
-      showSuccess(`已是最新版本：${tag_name}`);
-    } else {
-      setUpdateData({
-        tag_name: tag_name,
-        content: marked.parse(body),
-      });
-      setShowUpdateModal(true);
+    try {
+      const res = await API.get(
+        'https://api.github.com/repos/liuchenyao114/123/releases/latest'
+      );
+      const { tag_name, body } = res.data;
+      if (tag_name === getCurrentVersion()) {
+        showSuccess(`已是最新版本：${tag_name}`);
+      } else {
+        setUpdateData({
+          tag_name: tag_name,
+          content: marked.parse(body || ''),
+        });
+        setShowUpdateModal(true);
+      }
+    } catch (e) {
+      showError('检查更新失败，请稍后重试');
     }
   };
 

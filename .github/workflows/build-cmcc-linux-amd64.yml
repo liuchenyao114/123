@@ -68,6 +68,8 @@ jobs:
           /tmp/channel.test
           go test -c -o /tmp/controller.test ./controller
           /tmp/controller.test
+          go test -c -o /tmp/middleware.test ./middleware
+          /tmp/middleware.test
 
       - name: Build backend (CGO enabled, static, SQLite works)
         env:

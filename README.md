@@ -28,7 +28,7 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
 
 ## 本仓库简介
 
-本仓库是 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) 的定制分支，基于上游 `master` 提交 `fbbfa58`（2025-11-22，`git describe --tags` = `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新）。属于**非官方实现**，与中国移动无隶属关系。当前正式版本为 `v0.5.1`，各平台二进制见 [Releases](https://github.com/liuchenyao114/123/releases/latest)。
+本仓库是 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) 的定制分支，基于上游 `master` 提交 `fbbfa58`（2025-11-22，`git describe --tags` = `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新）。属于**非官方实现**，与中国移动无隶属关系。当前正式版本为 `v0.5.2`，各平台二进制见 [Releases](https://github.com/liuchenyao114/123/releases/latest)。
 
 | 相对上游的变化 | 说明 |
 | --- | --- |
@@ -36,7 +36,8 @@ _✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，
 | ➕ 接口可选多个通道 | 「接口配置（Webhook）」页的通道下拉可多选，一次请求把同一条消息分别投递到所有选中通道，失败互不拖累；`/push` 也支持 `channel=a|b` |
 | ➖ 移除 `tencent_alarm` | 腾讯云自定义告警/短信通道的代码、界面与文档全部删除 |
 | 🔧 构建与发布 | push `main` 自动重建前端 + 跑单元测试 + 编译 linux/amd64；打 tag 或手动触发 `Release (multi-platform)` 自动发布 4 个平台的正式 Release |
-| 🔧 附带文件 | `VERSION`、`docker-compose.cmcc.yml`、`cmd/cmcc-probe` 链路诊断工具、channel/controller 单元测试 |
+| 🔧 v0.5.2 修复 | 首页与 API 不再被浏览器缓存一周；页脚与「检查更新」改以服务端版本为准，解决升级后页脚仍显示旧版本、反复提示「新版本可用」的问题 |
+| 🔧 附带文件 | `VERSION`、`docker-compose.cmcc.yml`、`cmd/cmcc-probe` 链路诊断工具、channel/controller/middleware 单元测试 |
 
 ### 快速开始
 
@@ -48,7 +49,7 @@ chmod +x message-pusher-linux-amd64
 
 浏览器打开 `http://<服务器IP>:3000`，用 `root` / `123456` 登录后**立即修改密码**，再到「通道」页新建通道、在「推送设置」里设置全局令牌。默认使用 SQLite，二进制静态链接，无需安装 Go、Node 或数据库。
 
-> 二进制内嵌了 Web 前端，服务器升级时必须**替换整个可执行文件并重启**；只改配置文件不会更新界面。
+> 二进制内嵌了 Web 前端，服务器升级时必须**替换整个可执行文件并重启**；只改配置文件不会更新界面。v0.5.2 起首页与 API 返回 `Cache-Control: no-store`，浏览器不会继续加载旧前端；如果前面挂了 CDN / 反向代理，请确认它不缓存 HTML，升级后仍显示旧界面时强制刷新一次并清理 CDN 缓存。
 
 ### 构建与发布
 
