@@ -1,732 +1,732 @@
-<p align="center">
-  <a href="https://github.com/songquanpeng/message-pusher"><img src="https://raw.githubusercontent.com/songquanpeng/message-pusher/master/web/public/logo.png" width="150" height="150" alt="message-pusher logo"></a>
-</p>
-
-<div align="center">
-
-# 消息推送服务
-
-_✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，支持 Markdown，仅单可执行文件，开箱即用✨_
-
-</div>
-
-<p align="center">基于 <a href="https://github.com/songquanpeng/message-pusher">songquanpeng/message-pusher</a> 定制 · MIT 协议</p>
-
-<p align="center">
-  <a href="https://github.com/liuchenyao114/123/releases/latest">程序下载</a>
-  ·
-  <a href="#快速开始">快速开始</a>
-  ·
-  <a href="#用法">使用教程</a>
-  ·
-  <a href="#中国移动新消息通道">CMCC 通道</a>
-  ·
-  <a href="#部署">部署教程</a>
-  ·
-  <a href="https://github.com/liuchenyao114/123/issues">意见反馈</a>
-</p>
-
-## 本仓库简介
-
-本仓库是 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) 的定制分支，基于上游 `master` 提交 `fbbfa58`（2025-11-22，`git describe --tags` = `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新）。属于**非官方实现**，与中国移动无隶属关系。当前正式版本为 `v0.5.3`，各平台二进制见 [Releases](https://github.com/liuchenyao114/123/releases/latest)。
-
-| 相对上游的变化 | 说明 |
-| --- | --- |
-| ➕ 新增 `cmcc` 通道 | Go 原生 WebSocket 对接中国移动「新消息 ClawBot / 5G 消息」，无需额外网关或 Cloudflare Worker；协议参考 [x-dr/cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)，实现见 `channel/cmcc.go` |
-| ➕ 接口可选多个通道 | 「接口配置（Webhook）」页的通道下拉可多选，一次请求把同一条消息分别投递到所有选中通道，失败互不拖累；`/push` 也支持 `channel=a|b` |
-| ➖ 移除 `tencent_alarm` | 腾讯云自定义告警/短信通道的代码、界面与文档全部删除 |
-| 🔧 构建与发布 | push `main` 自动重建前端 + 跑单元测试 + 编译 linux/amd64；打 tag 或手动触发 `Release (multi-platform)` 自动发布 4 个平台的正式 Release |
-| 🔧 v0.5.3 安全与稳定性修复 | 全量代码审查后修复：消息搜索越权（普通用户可搜到全库消息）、Markdown 存储型 XSS、TokenStore 并发写 map 崩溃、WebSocket/SSE 死锁、重发消息失败、删除用户无响应、SMTP 证书校验、前端错误拦截器吞异常、重复发布 workflow 冲突等；同时重建仓库内 `web/build` 与源码一致 |
-| 🔧 附带文件 | `VERSION`、`docker-compose.cmcc.yml`、`cmd/cmcc-probe` 链路诊断工具、channel/controller/middleware 单元测试 |
-
-### 快速开始
-
-```bash
-# 从 Releases 下载对应平台的二进制（Linux amd64 示例）
-chmod +x message-pusher-linux-amd64
-./message-pusher-linux-amd64 --port 3000
-```
-
-浏览器打开 `http://<服务器IP>:3000`，用 `root` / `123456` 登录后**立即修改密码**，再到「通道」页新建通道、在「推送设置」里设置全局令牌。默认使用 SQLite，二进制静态链接，无需安装 Go、Node 或数据库。
-
-> 二进制内嵌了 Web 前端，服务器升级时必须**替换整个可执行文件并重启**；只改配置文件不会更新界面。v0.5.2 起首页与 API 返回 `Cache-Control: no-store`，浏览器不会继续加载旧前端；如果前面挂了 CDN / 反向代理，请确认它不缓存 HTML，升级后仍显示旧界面时强制刷新一次并清理 CDN 缓存。
-
-### 构建与发布
-
-全部在 GitHub Actions 上完成，本地不需要 Go / Node 环境：
-
-| 触发 | 工作流 | 产物 |
-| --- | --- | --- |
-| push 到 `main` | `build-cmcc-linux-amd64.yml` | 从源码重建前端 → 单元测试 → 编译带 SQLite 的 linux/amd64 静态二进制，上传 Actions Artifact |
-| 打 `v*` tag 或手动触发 | `release.yml` | linux amd64/arm64、windows amd64、macOS arm64，自动发布正式 Release |
-
-仓库内附带的 `web/build` 仅供离线 `go build`（`go:embed` 需要它），**可能落后于源码**；CI 每次都会从源码重建前端，请以 Actions 产物为准。上游的 3 个 release 与 2 个 Docker 工作流已改为仅手动触发（推送镜像需配置 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`）。
-
-### 安全提示
-
-- 首次登录后立即修改默认密码 `root` / `123456`；对外开放时关闭注册、设置推送令牌并启用 HTTPS
-- API Key 与推送令牌存在数据库中，不要写进日志或提交到仓库
-- `cmcc` 为非官方实现，需号码/终端支持 ClawBot 并自行申请 API Key；写入 WebSocket 成功不代表手机已送达；建议单实例部署
-
-> **Warning**：原域名（msgpusher.com）将于 2026-11-24 下线，请尽快迁移至 https://push.justsong.cn
->
-> **Warning**：从 `v0.3` 升级到 `v0.4` 需要手动迁移数据库，见[迁移数据库](#迁移数据库)。
->
-> **Warning**：老数据库若残留 `type='tencent_alarm'` 的通道记录，执行 `DELETE FROM channels WHERE type = 'tencent_alarm';` 清理，否则推送到它会返回「不支持的消息通道」。
-
-## 描述
-1. **多种消息推送方式**：
-   + 邮件消息，
-   + 微信测试号，
-   + QQ，
-   + 企业微信应用号，
-   + 企业微信群机器人
-   + 飞书自建应用
-   + 飞书群机器人，
-   + 钉钉群机器人，
-   + Bark App,
-   + WebSocket 客户端（[官方客户端](https://github.com/songquanpeng/personal-assistant)，[接入文档](./docs/API.md#websocket-客户端)），
-   + Telegram 机器人，
-   + Discord 群机器人，
-   + 中国移动新消息（5G 消息 / ClawBot）：推送到手机「新消息」应用号，
-   + **群组消息**：预先把多个通道组合成群组，推送时指定群组名即可一次发到多个渠道（与[接口多选](#一次推送到多个通道)是两种不同的方式），
-   + **自定义消息**：可以自定义消息请求 URL 和请求体格式，实现与其他服务的对接，支持[众多第三方服务](https://iamazing.cn/page/message-pusher-common-custom-templates)。
-2. 支持**自定义 Webhook，反向适配各种调用平台**，你可以接入各种已有的系统，而无需修改其代码。
-3. 支持在 Web 端编辑 & 管理发送的消息，新消息发送后 Web 端**即时刷新**。
-4. 支持**异步**消息发送。
-5. 支持用户管理，支持多种用户登录注册方式：
-   + 邮箱登录注册以及通过邮箱进行密码重置。
-   + [GitHub 开放授权](https://github.com/settings/applications/new)。
-   + 微信公众号授权（需要额外部署 [WeChat Server](https://github.com/songquanpeng/wechat-server)）。
-6. 支持 Markdown。
-7. 支持 Cloudflare Turnstile 用户校验。
-8. 支持在线发布公告，设置关于界面以及页脚。
-9. API **兼容**其他消息推送服务，例如 [Server 酱](https://sct.ftqq.com/)。
-
-## 用途
-1. [整合进自己的博客系统，每当有人登录时发微信消息提醒](https://github.com/songquanpeng/blog/blob/486d63e96ef7906a6c767653a20ec2d3278e9a4a/routes/user.js#L27)。
-2. 在进行深度学习模型训练时，在每个 epoch 结束后[将关键数据发送到微信](https://github.com/songquanpeng/pytorch-template/blob/b2ba113659056080d3009b3014a67e977e2851bf/solver/solver.py#L223)以方便及时监控。
-3. 在各种脚本运行结束后发消息提醒，例如[监控 GitHub Star 数量的脚本](https://github.com/songquanpeng/scripts/blob/main/star_watcher.py)，又例如[自动健康填报的脚本](https://github.com/songquanpeng/daily-report)，用来通知运行结果。
-4. 为[其他系统](https://github.com/songquanpeng/personal-assistant#个人助理应用)提供消息推送功能。
-
-## 部署
-### 通过 Docker 部署
-部署：`docker run -d --restart always --name message-pusher -p 3000:3000 -e TZ=Asia/Shanghai -v /home/ubuntu/data/message-pusher:/data justsong/message-pusher`
-
-如果无法拉去，请将 `justsong/message-pusher` 替换为 `ghcr.io/songquanpeng/message-pusher`。
-
-更新：`docker run --rm -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower -cR`
-
-开放的端口号为 3000，之后用 Nginx 配置域名，反代以及 SSL 证书即可，具体参考[详细部署教程](https://iamazing.cn/page/how-to-deploy-a-website)。
-
-数据将会保存在宿主机的 `/home/ubuntu/data/message-pusher` 目录（只有一个 SQLite 数据库文件），请确保该目录存在且具有写入权限，或者更改为合适的目录。
-
-Nginx 的参考配置：
-```
-server{
-   server_name push.justsong.cn;  # 请根据实际情况修改你的域名
-   
-   location / {
-          client_max_body_size  64m;
-          proxy_http_version 1.1;
-          proxy_pass http://localhost:3000;  # 请根据实际情况修改你的端口
-          proxy_set_header Host $host;
-          proxy_set_header X-Forwarded-For $remote_addr;
-          proxy_cache_bypass $http_upgrade;
-          proxy_set_header Accept-Encoding gzip;
-   }
-}
-```
-
-之后使用 Let's Encrypt 的 certbot 配置 HTTPS：
-```bash
-# Ubuntu 安装 certbot：
-sudo snap install --classic certbot
-sudo ln -s /snap/bin/certbot /usr/bin/certbot
-# 生成证书 & 修改 Nginx 配置
-sudo certbot --nginx
-# 根据指示进行操作
-# 重启 Nginx
-sudo service nginx restart
-```
-
-### 手动部署
-1. 从 [GitHub Releases](https://github.com/songquanpeng/message-pusher/releases/latest) 下载可执行文件或者从源码编译：
-   ```shell
-   git clone https://github.com/songquanpeng/message-pusher.git
-   cd message-pusher/web
-   npm install
-   npm run build
-   cd ..
-   go mod download
-   go build -ldflags "-s -w" -o message-pusher
-   ````
-2. 运行：
-   ```shell
-   chmod u+x message-pusher
-   ./message-pusher --port 3000 --log-dir ./logs
-   ```
-3. 访问 [http://localhost:3000/](http://localhost:3000/) 并登录。初始账号用户名为 `root`，密码为 `123456`。
-
-如果服务需要长久运行，只是单纯地启动是不够的，[详细部署教程](https://iamazing.cn/page/how-to-deploy-a-website)。
-
-### 注意
-如果需要使用 WebSocket 客户端推送功能，则 Nginx 的配置文件中 `proxy_read_timeout` 和 `proxy_send_timeout` 务必设置超过 1 分钟。
-
-推荐设置：
-```
-proxy_read_timeout 300s;
-proxy_send_timeout 300s;   
-```
-
-## 配置
-系统本身仅需要下载一个可执行文件即可开始使用，无其他依赖。
-
-你可以通过设置环境变量或者命令行参数进行配置。
-
-等到系统启动后，使用 `root` 用户登录系统并做进一步的配置，默认密码为 `123456`。
-
-### 环境变量
-1. `REDIS_CONN_STRING`：设置之后将使用 Redis 作为请求频率限制的存储，而非使用内存存储。
-    + 例子：`REDIS_CONN_STRING=redis://default:redispw@localhost:49153`
-2. `SESSION_SECRET`：设置之后将使用固定的会话密钥，这样系统重新启动后已登录用户的 cookie 将依旧有效。
-    + 例子：`SESSION_SECRET=random_string`
-3. `SQL_DSN`：设置之后将使用指定数据库而非 SQLite。
-    + 例子：`SQL_DSN=root:123456@tcp(localhost:3306)/message-pusher`
-
-注意：使用 Docker 部署时，请使用 `-e key=value` 设置环境变量。 
-
-例子：`docker run -e SESSION_SECRET=random_string ...`
-
-### 命令行参数
-1. `--port <port_number>`: 指定服务器监听的端口号，默认为 `3000`。
-    + 例子：`--port 3000`
-2. `--log-dir <log_dir>`: 指定日志文件夹，如果没有设置，日志将不会被保存。
-    + 例子：`--log-dir ./logs`
-3. `--version`: 打印系统版本号并退出。
-
-
-### 进一步的配置
-1. 系统设置：
-   1. 填写服务器地址。
-   2. 配置登录注册选项，如果系统不对外开放，请取消选择`允许新用户注册`。
-   3. 配置 SMTP 服务，可以使用 QQ 邮箱的 SMTP 服务。
-   4. 其他配置可选，请按照页面上的指示完成配置。
-2. 个人设置：
-   1. 点击`更新用户信息`更改默认用户名和密码。
-   2. 点击`绑定邮箱地址`绑定邮箱以启用邮件消息推送方式。
-3. 推送设置：
-   1. 设置`默认推送方式`，默认为通过邮件进行推送。
-   2. 设置`推送 token`，用以推送 API 调用鉴权，如果不需要留空即可。
-   3. 设置其他推送方式，按照页面上的指示即可，完成配置后点击对应的`测试`按钮即可测试配置是否成功。
-4. 其他设置：如果系统对外提供服务，本系统也提供了一定的个性化设置功能，你可以设置关于界面和页脚，以及发布公告。
-
-## 用法
-1. 消息推送 API URL：`https://<domain>/push/<username>`
-   + 将上面的 `<domain>` 以及 `<username>` 替换为真实值，例如：`https://push.mydomain.cn/push/admin`
-2. `GET` 请求方式：`https://<domain>/push/<username>?title=<标题>&description=<描述>&content=<Markdown 文本>&channel=<推送方式>&token=<推送 token>`
-   1. `title`：选填，受限于具体的消息推送方式，其可能被忽略。
-   2. `description`：必填，可以替换为 `desp`。
-   3. `content`：选填，受限于具体的消息推送方式，Markdown 语法的支持有所区别。
-   4. `channel`：选填，如果不填则系统使用你在后台设置的默认推送通道。注意，此处填的是消息通道的名称，而非类型。可选的推送通道类型有：
-      1. `email`：通过发送邮件的方式进行推送（使用 `title` 或 `description` 字段设置邮件主题，使用 `content` 字段设置正文，支持完整的 Markdown 语法）。
-      2. `test`：通过微信测试号进行推送（使用 `description` 字段设置模板消息内容，不支持 Markdown）。
-      3. `corp_app`：通过企业微信应用号进行推送（仅当使用企业微信 APP 时，如果设置了 `content` 字段，`title` 和 `description` 字段会被忽略；使用微信中的企业微信插件时正常）。
-      4. `lark_app`：通过飞书自建应用进行推送。
-      5. `corp`：通过企业微信群机器人推送（设置 `content` 字段则将渲染 Markdown 消息，支持 Markdown 的子集；设置 `description` 字段则为普通文本消息）。
-      6. `lark`：通过飞书群机器人进行推送（注意事项同上）。
-      7. `ding`：通过钉钉群机器人进行推送（注意事项同上）。
-      8. `bark`：通过 Bark 进行推送（支持 `title` 和 `description` 字段）。
-      9. `client`：通过 WebSocket 客户端进行推送（支持 `title` 和 `description` 字段）。
-      10. `telegram`：通过 Telegram 机器人进行推送（`description` 或 `content` 字段二选一，支持 Markdown 的子集）。
-      11. `discord`：通过 Discord 群机器人进行推送（注意事项同上）。
-      12. `one_bot`：通过 OneBot 协议推送消息到 QQ。
-      13. `group`：通过预先配置的消息推送通道群组进行推送。
-      14. `custom`：通过预先配置好的自定义推送通道进行推送。
-      15. `none`：仅保存到数据库，不做推送。
-      16. `cmcc`：通过中国移动「新消息 ClawBot」推送到手机 5G 消息（配置方法见[中国移动新消息通道](#中国移动新消息通道)）。
-   5. `token`：如果你在后台设置了推送 token，则此项必填。另外可以通过设置 HTTP `Authorization` 头部设置此项。
-      * 注意令牌有两种，一种是全局鉴权令牌，一种是通道维度的令牌，前者可以鉴权任何通道，后者只能鉴权指定通道。
-   6. `url`：选填，如果不填则系统自动为消息生成 URL，其内容为消息详情。
-   7. `to`：选填，推送给指定用户，如果不填则默认推送给自己，受限于具体的消息推送方式，有些推送方式不支持此项。
-      1. `@all`：推送给所有用户。
-      2. `user1|user2|user3`：推送给多个用户，用户之间使用 `|` 分隔。
-   8. `async`：选填，如果设置为 `true` 则消息推送将在后台异步进行，返回结果包含 `uuid` 字段，可用于后续[获取消息发送状态](./docs/API.md#通过消息 UUID 获取消息发送状态)。
-   9. `render_mode`：选填，
-      1. 如果设置为 `code`，则消息体会被自动嵌套在代码块中进行渲染；
-      2. 如果设置为 `raw`，则不进行 Markdown 解析；
-      3. 默认 `markdown`，即进行 Markdown 解析。
-3. `POST` 请求方式：字段与上面 `GET` 请求方式保持一致。
-   + 如果发送的是 JSON，HTTP Header `Content-Type` 请务必设置为 `application/json`，否则一律按 Form 处理。
-   + POST 请求方式下的 `token` 字段也可以通过 URL 查询参数进行设置。
-
-### 一次推送到多个通道
-
-两个入口都支持一次选择多个通道：
-
-- **推送接口**：`channel` 参数用 `|` 分隔多个通道名，例如 `channel=企业微信机器人|移动短信`。
-- **接口配置（Webhook）**：编辑页的「通道」下拉可多选，选中的通道会保存到该接口；触发一次 Webhook，同一条消息会分别投递到所有选中的通道。
-
-```shell
-curl "http://127.0.0.1:3000/push/root?title=告警&description=磁盘90%&channel=corp_bot|cmcc_phone&token=<全局令牌>"
-```
-
-说明：
-1. 每个通道独立鉴权、独立生成一条消息记录；响应中 `uuid` 是第一个通道的消息 UUID，`uuids` 是全部 UUID 数组。
-2. 某个通道失败（名称不存在、被禁用、发送报错）不影响其余通道；全部失败才返回 `success: false`，部分失败时 `message` 会列出失败原因。
-3. **鉴权（只针对直接调用 `/push` 接口；Webhook 由服务内部触发，不需要 token）**：每个通道可以有自己的推送码，这个码只对它自己有效。一次推多个通道时请用「推送设置」里的**全局鉴权令牌**（对所有通道都有效）；如果只带某个通道的码，其他设了独立令牌的通道会被跳过；账号设了全局令牌后，未设独立令牌的通道也必须带全局令牌。
-4. Webhook 下拉中的「默认通道」与其他通道互斥，选中它会清空其余选择；留空等同于使用账号默认通道。
-5. `webhooks.channel` 已扩为 `varchar(1024)`：MySQL 由 GORM AutoMigrate 自动改列（需数据库账号具备 ALTER 权限；否则手工执行 `ALTER TABLE webhooks MODIFY channel VARCHAR(1024) NOT NULL;`），SQLite 不限制长度，无需处理。
-
-
-**各种通道的支持程度：**
-
-|      通道类型       | `title` | `description` | `content` | `url` | `to` | Markdown 支持 |
-|:---------------:|:-------:|:-------------:|:---------:|:-----:|:----:|:-----------:|
-|     `email`     |    ✅    |       ✅       |     ✅     |   ❌   |  ✅️  |     ✅️      |
-|     `test`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅️  |      ✅      |
-|   `corp_app`    |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ✅      |
-|     `corp`      |    ❌    |       ✅       |     ✅     |  ✅️   |  ✅️  |      ✅      |
-|     `lark`      |    ❌    |       ✅       |     ✅     |   ❌   |  ✅   |      ✅      |
-|   `lark_app`    |    ❌    |       ✅       |     ✅     |  ❌️   |  ✅   |      ✅      |
-|     `ding`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ✅      |
-|     `bark`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ❌   |      ✅      |
-|    `client`     |    ✅    |       ✅       |     ❌     |   ❌   |  ❌   |      ❌      |
-|   `telegram`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ✅      |
-|    `discord`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ❌      |
-|     `cmcc`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ❌      |
-|    `one_bot`    |    ✅    |       ✅       |     ✅     |   ❌   |  ✅   |      ❌      |
-|    `custom`     |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |  取决于模板  |
-|     `group`     |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |  取决于子通道  |
-|     `none`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ✅      |
-
-注意：
-1. 对于大部分通道，`description` 字段和 `content` 是不能同时存在的，如果你只需要文字消息，请使用 `description` 字段，如果你需要发送 Markdown 消息，请使用 `content` 字段。
-2. 部分通道的 Markdown 支持实际上是通过 URL 跳转到本系统所渲染的消息详情实现的，其他通道的 Markdown 支持受限于具体的通道，支持的语法并不统一。
-
-### 中国移动新消息通道
-
-该通道把消息推送到手机「新消息」应用号，协议参考 [cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)，属于**非官方实现**，与中国移动无隶属关系。使用前请确认你的号码与终端支持「新消息 ClawBot」，并遵守相关服务条款。
-
-**获取 API Key**：用手机打开[中国移动官方文档](https://f.10086.cn/s/s/msgNotice/?infoId=oGaKNuZqtg6KbLn9OyRceA%3d%3d)，进入「新消息 ClawBot」应用号 → 绑定/解绑 → 立即授权，按提示完成认证后取得专属 API Key。请妥善保管，不要写入日志或提交到仓库。
-
-**通道配置**（后台 → 新建消息通道 → 类型选「中国移动新消息」）：
-
-| 表单项 | 对应字段 | 说明 |
-| --- | --- | --- |
-| API Key | `secret` | 必填，上面取得的 `CMCC_API_KEY` |
-| 默认接收人 | `account_id` | 选填；不填时自动使用最近一条入站消息的发送方 |
-| 协议版本 | `app_id` | 选填，默认 `2.0` |
-| WebSocket 服务地址 | `url` | 选填，默认 `wss://5gvas01.cmicmaap.com/gtw-ai/openclaw/ws/msg` |
-| 入站消息 Webhook | `other` | 选填，收到入站消息时把 JSON POST 到该地址 |
-
-接收人优先级：推送请求的 `to` 参数 > 通道默认接收人 > 最近一条入站消息的发送方。三者都没有时，先用手机向该应用号发送一条任意消息（或推送时显式传 `to`）即可。
-
-推送时 `title` 与 `description`/`content` 会合并为一段纯文本，Markdown 标记会被降级为纯文本；`render_mode=raw` 时保留原文。`url` 字段在本通道被解释为**富媒体直链**：当它是可识别的图片、音视频或文件直链时发送对应的媒体消息，否则忽略。发送成功只代表消息已写入 WebSocket，不代表手机端已送达或已读。
-
-本通道由 Go 进程直接维护 WebSocket 长连接（含认证、心跳与断线重连），**无需额外部署 Cloudflare Worker**。
-
-**示例：**
-
-<details>
-<summary><strong>Bash 示例 </strong></summary>
-<div>
-
-```shell
-#!/bin/bash
-
-MESSAGE_PUSHER_SERVER="https://push.justsong.cn"
-MESSAGE_PUSHER_USERNAME="test"
-MESSAGE_PUSHER_TOKEN="666"
-
-function send_message {
-  # POST Form
-  curl -s -X POST "$MESSAGE_PUSHER_SERVER/push/$MESSAGE_PUSHER_USERNAME" \
-    -d "title=$1&description=$2&content=$3&token=$MESSAGE_PUSHER_TOKEN" \
-    >/dev/null
-}
-
-function send_message_with_json {
-  # POST JSON
-  curl -s -X POST "$MESSAGE_PUSHER_SERVER/push/$MESSAGE_PUSHER_USERNAME" \
-    -H 'Content-Type: application/json' \
-    -d '{"title":"'"$1"'","desp":"'"$2"'", "content":"'"$3"'", "token":"'"$MESSAGE_PUSHER_TOKEN"'"}' \
-    >/dev/null
-}
-
-send_message 'title' 'description' 'content'
-```
-
-另一个版本：
-```shell
-MESSAGE_PUSHER_SERVER="https://push.justsong.cn"
-MESSAGE_PUSHER_USERNAME="test"
-MESSAGE_PUSHER_TOKEN="666"
-MESSAGE_PUSHER_CHANNEL="lark"
-
-sendmsg() {
-    if [ -t 0 ]; then
-        local param="$*"
-    else
-        local param=$(</dev/stdin)
-    fi
-    curl -s -o /dev/null --get --data-urlencode "content=${param}" "$MESSAGE_PUSHER_SERVER/push/$MESSAGE_PUSHER_USERNAME?channel=$MESSAGE_PUSHER_CHANNEL&token=$MESSAGE_PUSHER_TOKEN"
-}
-```
-
-之后便可以进行这样的操作：
-```shell
-uname -ra | sendmsg
-```
-
-</div>
-</details>
-
-<details>
-<summary><strong>Python 示例 </strong></summary>
-<div>
-
-```python
-import requests
-
-SERVER = "https://push.justsong.cn"
-USERNAME = "test"
-TOKEN = "666"
-
-
-def send_message(title, description, content):
-    # GET 方式
-    # res = requests.get(f"{SERVER}/push/{USERNAME}?title={title}"
-    #                    f"&description={description}&content={content}&token={TOKEN}")
-
-    # POST 方式
-    res = requests.post(f"{SERVER}/push/{USERNAME}", json={
-        "title": title,
-        "description": description,
-        "content": content,
-        "token": TOKEN
-    })
-    res = res.json()
-    if res["success"]:
-        return None
-    else:
-        return res["message"]
-
-
-error = send_message("标题", "描述", "**Markdown 内容**")
-if error:
-    print(error)
-```
-
-</div>
-</details>
-
-<details>
-<summary><strong>Go 示例 </strong></summary>
-<div>
-
-```go
-package main
-
-import (
-   "bytes"
-   "encoding/json"
-   "errors"
-   "fmt"
-   "net/http"
-   "net/url"
-)
-
-var serverAddress = "https://push.justsong.cn"
-var username = "test"
-var token = "666"
-
-type request struct {
-   Title       string `json:"title"`
-   Description string `json:"description"`
-   Content     string `json:"content"`
-   URL         string `json:"url"`
-   Channel     string `json:"channel"`
-   Token       string `json:"token"`
-}
-
-type response struct {
-   Success bool   `json:"success"`
-   Message string `json:"message"`
-}
-
-func SendMessage(title string, description string, content string) error {
-   req := request{
-      Title:       title,
-      Description: description,
-      Content:     content,
-      Token:       token,
-   }
-   data, err := json.Marshal(req)
-   if err != nil {
-      return err
-   }
-   resp, err := http.Post(fmt.Sprintf("%s/push/%s", serverAddress, username),
-      "application/json", bytes.NewBuffer(data))
-   if err != nil {
-      return err
-   }
-   var res response
-   err = json.NewDecoder(resp.Body).Decode(&res)
-   if err != nil {
-      return err
-   }
-   if !res.Success {
-      return errors.New(res.Message)
-   }
-   return nil
-}
-
-func SendMessageWithForm(title string, description string, content string) error {
-   resp, err := http.PostForm(fmt.Sprintf("%s/push/%s", serverAddress, username),
-      url.Values{"title": {title}, "description": {description}, "content": {content}, "token": {token}})
-   if err != nil {
-      return err
-   }
-   var res response
-   err = json.NewDecoder(resp.Body).Decode(&res)
-   if err != nil {
-      return err
-   }
-   if !res.Success {
-      return errors.New(res.Message)
-   }
-   return nil
-}
-
-func main() {
-   //err := SendMessage("标题", "描述", "**Markdown 内容**")
-   err := SendMessageWithForm("标题", "描述", "**Markdown 内容**")
-   if err != nil {
-      fmt.Println("推送失败：" + err.Error())
-   } else {
-      fmt.Println("推送成功！")
-   }
-}
-```
-
-</div>
-</details>
-
-<details>
-<summary><strong>C# 示例 </strong></summary>
-<div>
-
-```csharp
-using Newtonsoft.Json;
-using RestSharp;
-
-namespace Demo
-{
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            //推送消息
-            var sendMsg = MessagePusherTool.SendMessage("标题", "描述", "**Markdown 内容**");
-            if(sendMsg.Success)
-            {
-                Console.WriteLine($"推送成功！");
-            }
-            else
-            {
-                Console.WriteLine($"推送失败：{sendMsg.Message}");
-            }
-        }
-    }
-
-    /// <summary>
-    /// 消息推送工具
-    /// 
-    /// <para>开源地址：https://github.com/songquanpeng/message-pusher</para>
-    /// <para>支持：Framework、Net3.1、Net5、Net6</para>
-    /// <para>引用包：</para>
-    /// <para>dotnet add package Newtonsoft.Json -v 13.0.2</para>
-    /// <para>dotnet add package RestSharp -v 108.0.3</para>
-    /// </summary>
-    public class MessagePusherTool
-    {
-        /// <summary>
-        /// ServerAddress
-        /// </summary>
-        public const string ServerAddress = "https://push.justsong.cn";
-
-        /// <summary>
-        /// UserName
-        /// </summary>
-        public const string UserName = "test";
-
-        /// <summary>
-        /// Token
-        /// </summary>
-        public const string Token = "666";
-
-        /// <summary>
-        /// SendMessage
-        /// </summary>
-        /// <param name="title">title</param>
-        /// <param name="description">description</param>
-        /// <param name="content">content</param>
-        public static Response SendMessage(string title, string description, string content)
-        {
-            var requestData = new Request()
-            {
-                Title = title,
-                Description = description,
-                Content = content,
-                Token = Token,
-            };
-            var url = $"{ServerAddress}";
-            var client = new RestClient(url);
-            var request = new RestRequest($"push/{UserName}", Method.Post);
-            request.AddJsonBody(requestData);
-            var response = client.Execute(request);
-            var responseData = response.Content;
-            var responseJson = JsonConvert.DeserializeObject<Response>(responseData);
-            return responseJson;
-        }
-
-        /// <summary>
-        /// Request
-        /// </summary>
-        public class Request
-        {
-            /// <summary>
-            /// Title
-            /// </summary>
-            [JsonProperty(PropertyName = "title")]
-            public string Title { get; set; }
-
-            /// <summary>
-            /// Description
-            /// </summary>
-            [JsonProperty(PropertyName = "description")]
-            public string Description { get; set; }
-
-            /// <summary>
-            /// Content
-            /// </summary>
-            [JsonProperty(PropertyName = "content")]
-            public string Content { get; set; }
-
-            /// <summary>
-            /// URL
-            /// </summary>
-            [JsonProperty(PropertyName = "url")]
-            public string URL { get; set; }
-
-            /// <summary>
-            /// Channel
-            /// </summary>
-            [JsonProperty(PropertyName = "channel")]
-            public string Channel { get; set; }
-
-            /// <summary>
-            /// Token
-            /// </summary>
-            [JsonProperty(PropertyName = "token")]
-            public string Token { get; set; }
-        }
-
-        /// <summary>
-        /// Response
-        /// </summary>
-        public class Response
-        {
-            /// <summary>
-            /// Success
-            /// </summary>
-            [JsonProperty(PropertyName = "success")]
-            public bool Success { get; set; }
-
-            /// <summary>
-            /// Message
-            /// </summary>
-            [JsonProperty(PropertyName = "message")]
-            public string Message { get; set; }
-        }
-    }
-}
-```
-
-</div>
-</details>
-
-<details>
-<summary><strong>Node.js 示例 </strong></summary>
-<div>
-
-```javascript
-const axios = require('axios');
-const querystring = require('querystring');
-
-const MESSAGE_PUSHER_SERVER = 'https://push.justsong.cn'
-const MESSAGE_PUSHER_USERNAME = 'test'
-const MESSAGE_PUSHER_TOKEN = '666'
-
-async function send_message(title, description, content) {
-  try {
-    const postData = querystring.stringify({
-      title: title,
-      desp: description,
-      content: content,
-      token: MESSAGE_PUSHER_TOKEN,
-    })
-
-    const response = await axios.post(`${MESSAGE_PUSHER_SERVER}/push/${MESSAGE_PUSHER_USERNAME}`, postData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    })
-    if (response.data.success) {
-      return response.data
-    }
-  } catch (error) {
-    if (error.response) {
-      return error.response.data
-    } else {
-      throw error
-    }
-
-  }
-}
-
-send_message('标题', '描述', '**Markdown 内容**')
-  .then((response) => {
-    if (response.success) {
-      console.log('推送成功:', response)
-    } else {
-      console.log('推送失败:', response)
-    }
-  }, (error) => {
-    console.log(error.message);
-  })
-
-```
-</div>
-</details>
-
-欢迎 PR 添加更多语言的示例。
-
-
-## 迁移数据库
-此处均以 SQLite 为例，其他数据库请自行修改。我已经让 ChatGPT 翻译成对应的 SQL 版本，见 `bin` 文件夹，供参考。
-
-### 从 `v0.3` 迁移到 `v0.4`
-1. 首先备份你的数据库文件。
-2. 下载最新的 `v0.4` 版本，启动程序，程序会自动进行数据库表结构的迁移。
-3. 终止程序。
-4. 之后执行脚本：`./bin/migrate_v3_to_v4.py`，进行数据的迁移。
-5. 重新启动程序即可。
-
-注意，执行前请确保数据库中 `users` 表中字段的顺序和脚本中的一致，否则会出现数据错乱的情况。
-
-## 其他
-1. `v0.3` 之前的版本基于 Node.js，你可以切换到 [`nodejs`](https://github.com/songquanpeng/message-pusher/tree/nodejs) 分支查看，该版本不再有功能性更新。
-2. `v0.3` 以及后续版本基于 Gin Template [`v0.2.1`](https://github.com/songquanpeng/gin-template) 版本开发。
-3. 如果想要自行编译，请首先[编译前端](./web/README.md)，之后再编译后端，否则会遇到 `pattern web/build: no matching files found` 问题。
+<p align="center">
+  <a href="https://github.com/songquanpeng/message-pusher"><img src="https://raw.githubusercontent.com/songquanpeng/message-pusher/master/web/public/logo.png" width="150" height="150" alt="message-pusher logo"></a>
+</p>
+
+<div align="center">
+
+# 消息推送服务
+
+_✨ 搭建专属于你的消息推送服务，支持多种消息推送方式，支持 Markdown，仅单可执行文件，开箱即用✨_
+
+</div>
+
+<p align="center">基于 <a href="https://github.com/songquanpeng/message-pusher">songquanpeng/message-pusher</a> 定制 · MIT 协议</p>
+
+<p align="center">
+  <a href="https://github.com/liuchenyao114/123/releases/latest">程序下载</a>
+  ·
+  <a href="#快速开始">快速开始</a>
+  ·
+  <a href="#用法">使用教程</a>
+  ·
+  <a href="#中国移动新消息通道">CMCC 通道</a>
+  ·
+  <a href="#部署">部署教程</a>
+  ·
+  <a href="https://github.com/liuchenyao114/123/issues">意见反馈</a>
+</p>
+
+## 本仓库简介
+
+本仓库是 [songquanpeng/message-pusher](https://github.com/songquanpeng/message-pusher) 的定制分支，基于上游 `master` 提交 `fbbfa58`（2025-11-22，`git describe --tags` = `v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 更新）。属于**非官方实现**，与中国移动无隶属关系。当前正式版本为 `v0.5.4`，各平台二进制见 [Releases](https://github.com/liuchenyao114/123/releases/latest)。
+
+| 相对上游的变化 | 说明 |
+| --- | --- |
+| ➕ 新增 `cmcc` 通道 | Go 原生 WebSocket 对接中国移动「新消息 ClawBot / 5G 消息」，无需额外网关或 Cloudflare Worker；协议参考 [x-dr/cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)，实现见 `channel/cmcc.go` |
+| ➕ 接口可选多个通道 | 「接口配置（Webhook）」页的通道下拉可多选，一次请求把同一条消息分别投递到所有选中通道，失败互不拖累；`/push` 也支持 `channel=a|b` |
+| ➖ 移除 `tencent_alarm` | 腾讯云自定义告警/短信通道的代码、界面与文档全部删除 |
+| 🔧 构建与发布 | push `main` 自动重建前端 + 跑单元测试 + 编译 linux/amd64；打 tag 或手动触发 `Release (multi-platform)` 自动发布 4 个平台的正式 Release |
+| 🔧 v0.5.4 缓存自愈 | 前端检测到落后版本时自动换带版本号的 URL 重载，绕过 CDN 缓存的旧首页；v0.5.3 的安全与稳定性修复全部保留 | 全量代码审查后修复：消息搜索越权（普通用户可搜到全库消息）、Markdown 存储型 XSS、TokenStore 并发写 map 崩溃、WebSocket/SSE 死锁、重发消息失败、删除用户无响应、SMTP 证书校验、前端错误拦截器吞异常、重复发布 workflow 冲突等；同时重建仓库内 `web/build` 与源码一致 |
+| 🔧 附带文件 | `VERSION`、`docker-compose.cmcc.yml`、`cmd/cmcc-probe` 链路诊断工具、channel/controller/middleware 单元测试 |
+
+### 快速开始
+
+```bash
+# 从 Releases 下载对应平台的二进制（Linux amd64 示例）
+chmod +x message-pusher-linux-amd64
+./message-pusher-linux-amd64 --port 3000
+```
+
+浏览器打开 `http://<服务器IP>:3000`，用 `root` / `123456` 登录后**立即修改密码**，再到「通道」页新建通道、在「推送设置」里设置全局令牌。默认使用 SQLite，二进制静态链接，无需安装 Go、Node 或数据库。
+
+> 二进制内嵌了 Web 前端，服务器升级时必须**替换整个可执行文件并重启**；只改配置文件不会更新界面。v0.5.2 起首页与 API 返回 `Cache-Control: no-store`，浏览器不会继续加载旧前端；如果前面挂了 CDN / 反向代理（如 Cloudflare），**务必配置不缓存 HTML 首页 `/`**（只缓存带 hash 的 `/static/` 资源）。v0.5.4 起前端会自动检测版本并用带 `_v` 参数的新 URL 重载来绕过旧缓存，但首次从旧版升级时，仍需在 CDN 后台清一次首页缓存（或让用户访问一次 `/?_v=<当前版本>`），因为旧版脚本本身没有自愈逻辑。
+
+### 构建与发布
+
+全部在 GitHub Actions 上完成，本地不需要 Go / Node 环境：
+
+| 触发 | 工作流 | 产物 |
+| --- | --- | --- |
+| push 到 `main` | `build-cmcc-linux-amd64.yml` | 从源码重建前端 → 单元测试 → 编译带 SQLite 的 linux/amd64 静态二进制，上传 Actions Artifact |
+| 打 `v*` tag 或手动触发 | `release.yml` | linux amd64/arm64、windows amd64、macOS arm64，自动发布正式 Release |
+
+仓库内附带的 `web/build` 仅供离线 `go build`（`go:embed` 需要它），**可能落后于源码**；CI 每次都会从源码重建前端，请以 Actions 产物为准。上游的 3 个 release 与 2 个 Docker 工作流已改为仅手动触发（推送镜像需配置 `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`）。
+
+### 安全提示
+
+- 首次登录后立即修改默认密码 `root` / `123456`；对外开放时关闭注册、设置推送令牌并启用 HTTPS
+- API Key 与推送令牌存在数据库中，不要写进日志或提交到仓库
+- `cmcc` 为非官方实现，需号码/终端支持 ClawBot 并自行申请 API Key；写入 WebSocket 成功不代表手机已送达；建议单实例部署
+
+> **Warning**：原域名（msgpusher.com）将于 2026-11-24 下线，请尽快迁移至 https://push.justsong.cn
+>
+> **Warning**：从 `v0.3` 升级到 `v0.4` 需要手动迁移数据库，见[迁移数据库](#迁移数据库)。
+>
+> **Warning**：老数据库若残留 `type='tencent_alarm'` 的通道记录，执行 `DELETE FROM channels WHERE type = 'tencent_alarm';` 清理，否则推送到它会返回「不支持的消息通道」。
+
+## 描述
+1. **多种消息推送方式**：
+   + 邮件消息，
+   + 微信测试号，
+   + QQ，
+   + 企业微信应用号，
+   + 企业微信群机器人
+   + 飞书自建应用
+   + 飞书群机器人，
+   + 钉钉群机器人，
+   + Bark App,
+   + WebSocket 客户端（[官方客户端](https://github.com/songquanpeng/personal-assistant)，[接入文档](./docs/API.md#websocket-客户端)），
+   + Telegram 机器人，
+   + Discord 群机器人，
+   + 中国移动新消息（5G 消息 / ClawBot）：推送到手机「新消息」应用号，
+   + **群组消息**：预先把多个通道组合成群组，推送时指定群组名即可一次发到多个渠道（与[接口多选](#一次推送到多个通道)是两种不同的方式），
+   + **自定义消息**：可以自定义消息请求 URL 和请求体格式，实现与其他服务的对接，支持[众多第三方服务](https://iamazing.cn/page/message-pusher-common-custom-templates)。
+2. 支持**自定义 Webhook，反向适配各种调用平台**，你可以接入各种已有的系统，而无需修改其代码。
+3. 支持在 Web 端编辑 & 管理发送的消息，新消息发送后 Web 端**即时刷新**。
+4. 支持**异步**消息发送。
+5. 支持用户管理，支持多种用户登录注册方式：
+   + 邮箱登录注册以及通过邮箱进行密码重置。
+   + [GitHub 开放授权](https://github.com/settings/applications/new)。
+   + 微信公众号授权（需要额外部署 [WeChat Server](https://github.com/songquanpeng/wechat-server)）。
+6. 支持 Markdown。
+7. 支持 Cloudflare Turnstile 用户校验。
+8. 支持在线发布公告，设置关于界面以及页脚。
+9. API **兼容**其他消息推送服务，例如 [Server 酱](https://sct.ftqq.com/)。
+
+## 用途
+1. [整合进自己的博客系统，每当有人登录时发微信消息提醒](https://github.com/songquanpeng/blog/blob/486d63e96ef7906a6c767653a20ec2d3278e9a4a/routes/user.js#L27)。
+2. 在进行深度学习模型训练时，在每个 epoch 结束后[将关键数据发送到微信](https://github.com/songquanpeng/pytorch-template/blob/b2ba113659056080d3009b3014a67e977e2851bf/solver/solver.py#L223)以方便及时监控。
+3. 在各种脚本运行结束后发消息提醒，例如[监控 GitHub Star 数量的脚本](https://github.com/songquanpeng/scripts/blob/main/star_watcher.py)，又例如[自动健康填报的脚本](https://github.com/songquanpeng/daily-report)，用来通知运行结果。
+4. 为[其他系统](https://github.com/songquanpeng/personal-assistant#个人助理应用)提供消息推送功能。
+
+## 部署
+### 通过 Docker 部署
+部署：`docker run -d --restart always --name message-pusher -p 3000:3000 -e TZ=Asia/Shanghai -v /home/ubuntu/data/message-pusher:/data justsong/message-pusher`
+
+如果无法拉去，请将 `justsong/message-pusher` 替换为 `ghcr.io/songquanpeng/message-pusher`。
+
+更新：`docker run --rm -v /var/run/docker.sock:/var/run/docker.sock containrrr/watchtower -cR`
+
+开放的端口号为 3000，之后用 Nginx 配置域名，反代以及 SSL 证书即可，具体参考[详细部署教程](https://iamazing.cn/page/how-to-deploy-a-website)。
+
+数据将会保存在宿主机的 `/home/ubuntu/data/message-pusher` 目录（只有一个 SQLite 数据库文件），请确保该目录存在且具有写入权限，或者更改为合适的目录。
+
+Nginx 的参考配置：
+```
+server{
+   server_name push.justsong.cn;  # 请根据实际情况修改你的域名
+   
+   location / {
+          client_max_body_size  64m;
+          proxy_http_version 1.1;
+          proxy_pass http://localhost:3000;  # 请根据实际情况修改你的端口
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $remote_addr;
+          proxy_cache_bypass $http_upgrade;
+          proxy_set_header Accept-Encoding gzip;
+   }
+}
+```
+
+之后使用 Let's Encrypt 的 certbot 配置 HTTPS：
+```bash
+# Ubuntu 安装 certbot：
+sudo snap install --classic certbot
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
+# 生成证书 & 修改 Nginx 配置
+sudo certbot --nginx
+# 根据指示进行操作
+# 重启 Nginx
+sudo service nginx restart
+```
+
+### 手动部署
+1. 从 [GitHub Releases](https://github.com/songquanpeng/message-pusher/releases/latest) 下载可执行文件或者从源码编译：
+   ```shell
+   git clone https://github.com/songquanpeng/message-pusher.git
+   cd message-pusher/web
+   npm install
+   npm run build
+   cd ..
+   go mod download
+   go build -ldflags "-s -w" -o message-pusher
+   ````
+2. 运行：
+   ```shell
+   chmod u+x message-pusher
+   ./message-pusher --port 3000 --log-dir ./logs
+   ```
+3. 访问 [http://localhost:3000/](http://localhost:3000/) 并登录。初始账号用户名为 `root`，密码为 `123456`。
+
+如果服务需要长久运行，只是单纯地启动是不够的，[详细部署教程](https://iamazing.cn/page/how-to-deploy-a-website)。
+
+### 注意
+如果需要使用 WebSocket 客户端推送功能，则 Nginx 的配置文件中 `proxy_read_timeout` 和 `proxy_send_timeout` 务必设置超过 1 分钟。
+
+推荐设置：
+```
+proxy_read_timeout 300s;
+proxy_send_timeout 300s;   
+```
+
+## 配置
+系统本身仅需要下载一个可执行文件即可开始使用，无其他依赖。
+
+你可以通过设置环境变量或者命令行参数进行配置。
+
+等到系统启动后，使用 `root` 用户登录系统并做进一步的配置，默认密码为 `123456`。
+
+### 环境变量
+1. `REDIS_CONN_STRING`：设置之后将使用 Redis 作为请求频率限制的存储，而非使用内存存储。
+    + 例子：`REDIS_CONN_STRING=redis://default:redispw@localhost:49153`
+2. `SESSION_SECRET`：设置之后将使用固定的会话密钥，这样系统重新启动后已登录用户的 cookie 将依旧有效。
+    + 例子：`SESSION_SECRET=random_string`
+3. `SQL_DSN`：设置之后将使用指定数据库而非 SQLite。
+    + 例子：`SQL_DSN=root:123456@tcp(localhost:3306)/message-pusher`
+
+注意：使用 Docker 部署时，请使用 `-e key=value` 设置环境变量。 
+
+例子：`docker run -e SESSION_SECRET=random_string ...`
+
+### 命令行参数
+1. `--port <port_number>`: 指定服务器监听的端口号，默认为 `3000`。
+    + 例子：`--port 3000`
+2. `--log-dir <log_dir>`: 指定日志文件夹，如果没有设置，日志将不会被保存。
+    + 例子：`--log-dir ./logs`
+3. `--version`: 打印系统版本号并退出。
+
+
+### 进一步的配置
+1. 系统设置：
+   1. 填写服务器地址。
+   2. 配置登录注册选项，如果系统不对外开放，请取消选择`允许新用户注册`。
+   3. 配置 SMTP 服务，可以使用 QQ 邮箱的 SMTP 服务。
+   4. 其他配置可选，请按照页面上的指示完成配置。
+2. 个人设置：
+   1. 点击`更新用户信息`更改默认用户名和密码。
+   2. 点击`绑定邮箱地址`绑定邮箱以启用邮件消息推送方式。
+3. 推送设置：
+   1. 设置`默认推送方式`，默认为通过邮件进行推送。
+   2. 设置`推送 token`，用以推送 API 调用鉴权，如果不需要留空即可。
+   3. 设置其他推送方式，按照页面上的指示即可，完成配置后点击对应的`测试`按钮即可测试配置是否成功。
+4. 其他设置：如果系统对外提供服务，本系统也提供了一定的个性化设置功能，你可以设置关于界面和页脚，以及发布公告。
+
+## 用法
+1. 消息推送 API URL：`https://<domain>/push/<username>`
+   + 将上面的 `<domain>` 以及 `<username>` 替换为真实值，例如：`https://push.mydomain.cn/push/admin`
+2. `GET` 请求方式：`https://<domain>/push/<username>?title=<标题>&description=<描述>&content=<Markdown 文本>&channel=<推送方式>&token=<推送 token>`
+   1. `title`：选填，受限于具体的消息推送方式，其可能被忽略。
+   2. `description`：必填，可以替换为 `desp`。
+   3. `content`：选填，受限于具体的消息推送方式，Markdown 语法的支持有所区别。
+   4. `channel`：选填，如果不填则系统使用你在后台设置的默认推送通道。注意，此处填的是消息通道的名称，而非类型。可选的推送通道类型有：
+      1. `email`：通过发送邮件的方式进行推送（使用 `title` 或 `description` 字段设置邮件主题，使用 `content` 字段设置正文，支持完整的 Markdown 语法）。
+      2. `test`：通过微信测试号进行推送（使用 `description` 字段设置模板消息内容，不支持 Markdown）。
+      3. `corp_app`：通过企业微信应用号进行推送（仅当使用企业微信 APP 时，如果设置了 `content` 字段，`title` 和 `description` 字段会被忽略；使用微信中的企业微信插件时正常）。
+      4. `lark_app`：通过飞书自建应用进行推送。
+      5. `corp`：通过企业微信群机器人推送（设置 `content` 字段则将渲染 Markdown 消息，支持 Markdown 的子集；设置 `description` 字段则为普通文本消息）。
+      6. `lark`：通过飞书群机器人进行推送（注意事项同上）。
+      7. `ding`：通过钉钉群机器人进行推送（注意事项同上）。
+      8. `bark`：通过 Bark 进行推送（支持 `title` 和 `description` 字段）。
+      9. `client`：通过 WebSocket 客户端进行推送（支持 `title` 和 `description` 字段）。
+      10. `telegram`：通过 Telegram 机器人进行推送（`description` 或 `content` 字段二选一，支持 Markdown 的子集）。
+      11. `discord`：通过 Discord 群机器人进行推送（注意事项同上）。
+      12. `one_bot`：通过 OneBot 协议推送消息到 QQ。
+      13. `group`：通过预先配置的消息推送通道群组进行推送。
+      14. `custom`：通过预先配置好的自定义推送通道进行推送。
+      15. `none`：仅保存到数据库，不做推送。
+      16. `cmcc`：通过中国移动「新消息 ClawBot」推送到手机 5G 消息（配置方法见[中国移动新消息通道](#中国移动新消息通道)）。
+   5. `token`：如果你在后台设置了推送 token，则此项必填。另外可以通过设置 HTTP `Authorization` 头部设置此项。
+      * 注意令牌有两种，一种是全局鉴权令牌，一种是通道维度的令牌，前者可以鉴权任何通道，后者只能鉴权指定通道。
+   6. `url`：选填，如果不填则系统自动为消息生成 URL，其内容为消息详情。
+   7. `to`：选填，推送给指定用户，如果不填则默认推送给自己，受限于具体的消息推送方式，有些推送方式不支持此项。
+      1. `@all`：推送给所有用户。
+      2. `user1|user2|user3`：推送给多个用户，用户之间使用 `|` 分隔。
+   8. `async`：选填，如果设置为 `true` 则消息推送将在后台异步进行，返回结果包含 `uuid` 字段，可用于后续[获取消息发送状态](./docs/API.md#通过消息 UUID 获取消息发送状态)。
+   9. `render_mode`：选填，
+      1. 如果设置为 `code`，则消息体会被自动嵌套在代码块中进行渲染；
+      2. 如果设置为 `raw`，则不进行 Markdown 解析；
+      3. 默认 `markdown`，即进行 Markdown 解析。
+3. `POST` 请求方式：字段与上面 `GET` 请求方式保持一致。
+   + 如果发送的是 JSON，HTTP Header `Content-Type` 请务必设置为 `application/json`，否则一律按 Form 处理。
+   + POST 请求方式下的 `token` 字段也可以通过 URL 查询参数进行设置。
+
+### 一次推送到多个通道
+
+两个入口都支持一次选择多个通道：
+
+- **推送接口**：`channel` 参数用 `|` 分隔多个通道名，例如 `channel=企业微信机器人|移动短信`。
+- **接口配置（Webhook）**：编辑页的「通道」下拉可多选，选中的通道会保存到该接口；触发一次 Webhook，同一条消息会分别投递到所有选中的通道。
+
+```shell
+curl "http://127.0.0.1:3000/push/root?title=告警&description=磁盘90%&channel=corp_bot|cmcc_phone&token=<全局令牌>"
+```
+
+说明：
+1. 每个通道独立鉴权、独立生成一条消息记录；响应中 `uuid` 是第一个通道的消息 UUID，`uuids` 是全部 UUID 数组。
+2. 某个通道失败（名称不存在、被禁用、发送报错）不影响其余通道；全部失败才返回 `success: false`，部分失败时 `message` 会列出失败原因。
+3. **鉴权（只针对直接调用 `/push` 接口；Webhook 由服务内部触发，不需要 token）**：每个通道可以有自己的推送码，这个码只对它自己有效。一次推多个通道时请用「推送设置」里的**全局鉴权令牌**（对所有通道都有效）；如果只带某个通道的码，其他设了独立令牌的通道会被跳过；账号设了全局令牌后，未设独立令牌的通道也必须带全局令牌。
+4. Webhook 下拉中的「默认通道」与其他通道互斥，选中它会清空其余选择；留空等同于使用账号默认通道。
+5. `webhooks.channel` 已扩为 `varchar(1024)`：MySQL 由 GORM AutoMigrate 自动改列（需数据库账号具备 ALTER 权限；否则手工执行 `ALTER TABLE webhooks MODIFY channel VARCHAR(1024) NOT NULL;`），SQLite 不限制长度，无需处理。
+
+
+**各种通道的支持程度：**
+
+|      通道类型       | `title` | `description` | `content` | `url` | `to` | Markdown 支持 |
+|:---------------:|:-------:|:-------------:|:---------:|:-----:|:----:|:-----------:|
+|     `email`     |    ✅    |       ✅       |     ✅     |   ❌   |  ✅️  |     ✅️      |
+|     `test`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅️  |      ✅      |
+|   `corp_app`    |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ✅      |
+|     `corp`      |    ❌    |       ✅       |     ✅     |  ✅️   |  ✅️  |      ✅      |
+|     `lark`      |    ❌    |       ✅       |     ✅     |   ❌   |  ✅   |      ✅      |
+|   `lark_app`    |    ❌    |       ✅       |     ✅     |  ❌️   |  ✅   |      ✅      |
+|     `ding`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ✅      |
+|     `bark`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ❌   |      ✅      |
+|    `client`     |    ✅    |       ✅       |     ❌     |   ❌   |  ❌   |      ❌      |
+|   `telegram`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ✅      |
+|    `discord`    |    ❌    |       ❌       |     ✅     |   ❌   |  ✅   |      ❌      |
+|     `cmcc`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ❌      |
+|    `one_bot`    |    ✅    |       ✅       |     ✅     |   ❌   |  ✅   |      ❌      |
+|    `custom`     |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |  取决于模板  |
+|     `group`     |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |  取决于子通道  |
+|     `none`      |    ✅    |       ✅       |     ✅     |  ✅️   |  ✅   |      ✅      |
+
+注意：
+1. 对于大部分通道，`description` 字段和 `content` 是不能同时存在的，如果你只需要文字消息，请使用 `description` 字段，如果你需要发送 Markdown 消息，请使用 `content` 字段。
+2. 部分通道的 Markdown 支持实际上是通过 URL 跳转到本系统所渲染的消息详情实现的，其他通道的 Markdown 支持受限于具体的通道，支持的语法并不统一。
+
+### 中国移动新消息通道
+
+该通道把消息推送到手机「新消息」应用号，协议参考 [cmcc-message-gateway](https://github.com/x-dr/cmcc-message-gateway)，属于**非官方实现**，与中国移动无隶属关系。使用前请确认你的号码与终端支持「新消息 ClawBot」，并遵守相关服务条款。
+
+**获取 API Key**：用手机打开[中国移动官方文档](https://f.10086.cn/s/s/msgNotice/?infoId=oGaKNuZqtg6KbLn9OyRceA%3d%3d)，进入「新消息 ClawBot」应用号 → 绑定/解绑 → 立即授权，按提示完成认证后取得专属 API Key。请妥善保管，不要写入日志或提交到仓库。
+
+**通道配置**（后台 → 新建消息通道 → 类型选「中国移动新消息」）：
+
+| 表单项 | 对应字段 | 说明 |
+| --- | --- | --- |
+| API Key | `secret` | 必填，上面取得的 `CMCC_API_KEY` |
+| 默认接收人 | `account_id` | 选填；不填时自动使用最近一条入站消息的发送方 |
+| 协议版本 | `app_id` | 选填，默认 `2.0` |
+| WebSocket 服务地址 | `url` | 选填，默认 `wss://5gvas01.cmicmaap.com/gtw-ai/openclaw/ws/msg` |
+| 入站消息 Webhook | `other` | 选填，收到入站消息时把 JSON POST 到该地址 |
+
+接收人优先级：推送请求的 `to` 参数 > 通道默认接收人 > 最近一条入站消息的发送方。三者都没有时，先用手机向该应用号发送一条任意消息（或推送时显式传 `to`）即可。
+
+推送时 `title` 与 `description`/`content` 会合并为一段纯文本，Markdown 标记会被降级为纯文本；`render_mode=raw` 时保留原文。`url` 字段在本通道被解释为**富媒体直链**：当它是可识别的图片、音视频或文件直链时发送对应的媒体消息，否则忽略。发送成功只代表消息已写入 WebSocket，不代表手机端已送达或已读。
+
+本通道由 Go 进程直接维护 WebSocket 长连接（含认证、心跳与断线重连），**无需额外部署 Cloudflare Worker**。
+
+**示例：**
+
+<details>
+<summary><strong>Bash 示例 </strong></summary>
+<div>
+
+```shell
+#!/bin/bash
+
+MESSAGE_PUSHER_SERVER="https://push.justsong.cn"
+MESSAGE_PUSHER_USERNAME="test"
+MESSAGE_PUSHER_TOKEN="666"
+
+function send_message {
+  # POST Form
+  curl -s -X POST "$MESSAGE_PUSHER_SERVER/push/$MESSAGE_PUSHER_USERNAME" \
+    -d "title=$1&description=$2&content=$3&token=$MESSAGE_PUSHER_TOKEN" \
+    >/dev/null
+}
+
+function send_message_with_json {
+  # POST JSON
+  curl -s -X POST "$MESSAGE_PUSHER_SERVER/push/$MESSAGE_PUSHER_USERNAME" \
+    -H 'Content-Type: application/json' \
+    -d '{"title":"'"$1"'","desp":"'"$2"'", "content":"'"$3"'", "token":"'"$MESSAGE_PUSHER_TOKEN"'"}' \
+    >/dev/null
+}
+
+send_message 'title' 'description' 'content'
+```
+
+另一个版本：
+```shell
+MESSAGE_PUSHER_SERVER="https://push.justsong.cn"
+MESSAGE_PUSHER_USERNAME="test"
+MESSAGE_PUSHER_TOKEN="666"
+MESSAGE_PUSHER_CHANNEL="lark"
+
+sendmsg() {
+    if [ -t 0 ]; then
+        local param="$*"
+    else
+        local param=$(</dev/stdin)
+    fi
+    curl -s -o /dev/null --get --data-urlencode "content=${param}" "$MESSAGE_PUSHER_SERVER/push/$MESSAGE_PUSHER_USERNAME?channel=$MESSAGE_PUSHER_CHANNEL&token=$MESSAGE_PUSHER_TOKEN"
+}
+```
+
+之后便可以进行这样的操作：
+```shell
+uname -ra | sendmsg
+```
+
+</div>
+</details>
+
+<details>
+<summary><strong>Python 示例 </strong></summary>
+<div>
+
+```python
+import requests
+
+SERVER = "https://push.justsong.cn"
+USERNAME = "test"
+TOKEN = "666"
+
+
+def send_message(title, description, content):
+    # GET 方式
+    # res = requests.get(f"{SERVER}/push/{USERNAME}?title={title}"
+    #                    f"&description={description}&content={content}&token={TOKEN}")
+
+    # POST 方式
+    res = requests.post(f"{SERVER}/push/{USERNAME}", json={
+        "title": title,
+        "description": description,
+        "content": content,
+        "token": TOKEN
+    })
+    res = res.json()
+    if res["success"]:
+        return None
+    else:
+        return res["message"]
+
+
+error = send_message("标题", "描述", "**Markdown 内容**")
+if error:
+    print(error)
+```
+
+</div>
+</details>
+
+<details>
+<summary><strong>Go 示例 </strong></summary>
+<div>
+
+```go
+package main
+
+import (
+   "bytes"
+   "encoding/json"
+   "errors"
+   "fmt"
+   "net/http"
+   "net/url"
+)
+
+var serverAddress = "https://push.justsong.cn"
+var username = "test"
+var token = "666"
+
+type request struct {
+   Title       string `json:"title"`
+   Description string `json:"description"`
+   Content     string `json:"content"`
+   URL         string `json:"url"`
+   Channel     string `json:"channel"`
+   Token       string `json:"token"`
+}
+
+type response struct {
+   Success bool   `json:"success"`
+   Message string `json:"message"`
+}
+
+func SendMessage(title string, description string, content string) error {
+   req := request{
+      Title:       title,
+      Description: description,
+      Content:     content,
+      Token:       token,
+   }
+   data, err := json.Marshal(req)
+   if err != nil {
+      return err
+   }
+   resp, err := http.Post(fmt.Sprintf("%s/push/%s", serverAddress, username),
+      "application/json", bytes.NewBuffer(data))
+   if err != nil {
+      return err
+   }
+   var res response
+   err = json.NewDecoder(resp.Body).Decode(&res)
+   if err != nil {
+      return err
+   }
+   if !res.Success {
+      return errors.New(res.Message)
+   }
+   return nil
+}
+
+func SendMessageWithForm(title string, description string, content string) error {
+   resp, err := http.PostForm(fmt.Sprintf("%s/push/%s", serverAddress, username),
+      url.Values{"title": {title}, "description": {description}, "content": {content}, "token": {token}})
+   if err != nil {
+      return err
+   }
+   var res response
+   err = json.NewDecoder(resp.Body).Decode(&res)
+   if err != nil {
+      return err
+   }
+   if !res.Success {
+      return errors.New(res.Message)
+   }
+   return nil
+}
+
+func main() {
+   //err := SendMessage("标题", "描述", "**Markdown 内容**")
+   err := SendMessageWithForm("标题", "描述", "**Markdown 内容**")
+   if err != nil {
+      fmt.Println("推送失败：" + err.Error())
+   } else {
+      fmt.Println("推送成功！")
+   }
+}
+```
+
+</div>
+</details>
+
+<details>
+<summary><strong>C# 示例 </strong></summary>
+<div>
+
+```csharp
+using Newtonsoft.Json;
+using RestSharp;
+
+namespace Demo
+{
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
+            //推送消息
+            var sendMsg = MessagePusherTool.SendMessage("标题", "描述", "**Markdown 内容**");
+            if(sendMsg.Success)
+            {
+                Console.WriteLine($"推送成功！");
+            }
+            else
+            {
+                Console.WriteLine($"推送失败：{sendMsg.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 消息推送工具
+    /// 
+    /// <para>开源地址：https://github.com/songquanpeng/message-pusher</para>
+    /// <para>支持：Framework、Net3.1、Net5、Net6</para>
+    /// <para>引用包：</para>
+    /// <para>dotnet add package Newtonsoft.Json -v 13.0.2</para>
+    /// <para>dotnet add package RestSharp -v 108.0.3</para>
+    /// </summary>
+    public class MessagePusherTool
+    {
+        /// <summary>
+        /// ServerAddress
+        /// </summary>
+        public const string ServerAddress = "https://push.justsong.cn";
+
+        /// <summary>
+        /// UserName
+        /// </summary>
+        public const string UserName = "test";
+
+        /// <summary>
+        /// Token
+        /// </summary>
+        public const string Token = "666";
+
+        /// <summary>
+        /// SendMessage
+        /// </summary>
+        /// <param name="title">title</param>
+        /// <param name="description">description</param>
+        /// <param name="content">content</param>
+        public static Response SendMessage(string title, string description, string content)
+        {
+            var requestData = new Request()
+            {
+                Title = title,
+                Description = description,
+                Content = content,
+                Token = Token,
+            };
+            var url = $"{ServerAddress}";
+            var client = new RestClient(url);
+            var request = new RestRequest($"push/{UserName}", Method.Post);
+            request.AddJsonBody(requestData);
+            var response = client.Execute(request);
+            var responseData = response.Content;
+            var responseJson = JsonConvert.DeserializeObject<Response>(responseData);
+            return responseJson;
+        }
+
+        /// <summary>
+        /// Request
+        /// </summary>
+        public class Request
+        {
+            /// <summary>
+            /// Title
+            /// </summary>
+            [JsonProperty(PropertyName = "title")]
+            public string Title { get; set; }
+
+            /// <summary>
+            /// Description
+            /// </summary>
+            [JsonProperty(PropertyName = "description")]
+            public string Description { get; set; }
+
+            /// <summary>
+            /// Content
+            /// </summary>
+            [JsonProperty(PropertyName = "content")]
+            public string Content { get; set; }
+
+            /// <summary>
+            /// URL
+            /// </summary>
+            [JsonProperty(PropertyName = "url")]
+            public string URL { get; set; }
+
+            /// <summary>
+            /// Channel
+            /// </summary>
+            [JsonProperty(PropertyName = "channel")]
+            public string Channel { get; set; }
+
+            /// <summary>
+            /// Token
+            /// </summary>
+            [JsonProperty(PropertyName = "token")]
+            public string Token { get; set; }
+        }
+
+        /// <summary>
+        /// Response
+        /// </summary>
+        public class Response
+        {
+            /// <summary>
+            /// Success
+            /// </summary>
+            [JsonProperty(PropertyName = "success")]
+            public bool Success { get; set; }
+
+            /// <summary>
+            /// Message
+            /// </summary>
+            [JsonProperty(PropertyName = "message")]
+            public string Message { get; set; }
+        }
+    }
+}
+```
+
+</div>
+</details>
+
+<details>
+<summary><strong>Node.js 示例 </strong></summary>
+<div>
+
+```javascript
+const axios = require('axios');
+const querystring = require('querystring');
+
+const MESSAGE_PUSHER_SERVER = 'https://push.justsong.cn'
+const MESSAGE_PUSHER_USERNAME = 'test'
+const MESSAGE_PUSHER_TOKEN = '666'
+
+async function send_message(title, description, content) {
+  try {
+    const postData = querystring.stringify({
+      title: title,
+      desp: description,
+      content: content,
+      token: MESSAGE_PUSHER_TOKEN,
+    })
+
+    const response = await axios.post(`${MESSAGE_PUSHER_SERVER}/push/${MESSAGE_PUSHER_USERNAME}`, postData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+    if (response.data.success) {
+      return response.data
+    }
+  } catch (error) {
+    if (error.response) {
+      return error.response.data
+    } else {
+      throw error
+    }
+
+  }
+}
+
+send_message('标题', '描述', '**Markdown 内容**')
+  .then((response) => {
+    if (response.success) {
+      console.log('推送成功:', response)
+    } else {
+      console.log('推送失败:', response)
+    }
+  }, (error) => {
+    console.log(error.message);
+  })
+
+```
+</div>
+</details>
+
+欢迎 PR 添加更多语言的示例。
+
+
+## 迁移数据库
+此处均以 SQLite 为例，其他数据库请自行修改。我已经让 ChatGPT 翻译成对应的 SQL 版本，见 `bin` 文件夹，供参考。
+
+### 从 `v0.3` 迁移到 `v0.4`
+1. 首先备份你的数据库文件。
+2. 下载最新的 `v0.4` 版本，启动程序，程序会自动进行数据库表结构的迁移。
+3. 终止程序。
+4. 之后执行脚本：`./bin/migrate_v3_to_v4.py`，进行数据的迁移。
+5. 重新启动程序即可。
+
+注意，执行前请确保数据库中 `users` 表中字段的顺序和脚本中的一致，否则会出现数据错乱的情况。
+
+## 其他
+1. `v0.3` 之前的版本基于 Node.js，你可以切换到 [`nodejs`](https://github.com/songquanpeng/message-pusher/tree/nodejs) 分支查看，该版本不再有功能性更新。
+2. `v0.3` 以及后续版本基于 Gin Template [`v0.2.1`](https://github.com/songquanpeng/gin-template) 版本开发。
+3. 如果想要自行编译，请首先[编译前端](./web/README.md)，之后再编译后端，否则会遇到 `pattern web/build: no matching files found` 问题。

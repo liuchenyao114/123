@@ -9,7 +9,7 @@ import NotFound from './pages/NotFound';
 import Setting from './pages/Setting';
 import EditUser from './pages/User/EditUser';
 import AddUser from './pages/User/AddUser';
-import { API, showError, showNotice } from './helpers';
+import { API, showError } from './helpers';
 import PasswordResetForm from './components/PasswordResetForm';
 import GitHubOAuth from './components/GitHubOAuth';
 import PasswordResetConfirm from './components/PasswordResetConfirm';
@@ -44,17 +44,21 @@ function App() {
       statusDispatch({ type: 'set', payload: data });
       localStorage.setItem('footer_html', data.footer_html);
       localStorage.setItem('home_page_link', data.home_page_link);
-      // 后端版本是唯一真源。只在「本地记录的版本」与服务端版本不一致时
-      // 提示一次，并立即写入新版本，避免浏览器缓存旧前端时每次刷新都弹窗。
-      // 原实现拿构建时注入的 REACT_APP_VERSION 与服务端比较，一旦两者不一致
-      // 就会永久误报「新版本可用」。
-      const localVersion = localStorage.getItem('app_version');
-      const serverVersion = data.version || '';
-      if (serverVersion && serverVersion !== 'v0.0.0') {
-        if (localVersion && localVersion !== serverVersion) {
-          showNotice(
-            `新版本可用：${serverVersion}，请使用快捷键 Shift + F5 刷新页面`
-          );
+      // 后端版本是唯一真源。比较「前端构建版本」与服务端版本：
+      // 若前端落后，通常是因为 CDN 或浏览器缓存了旧的 index.html，导致一直加载
+      // 旧版脚本。此时仅提示「Shift+F5」无效（CDN 按 URL 缓存，强刷仍命中旧缓存），
+      // 因此自动换一个带版本号的 URL 重载：新 URL 是全新的缓存 key，会强制回源
+      // 拿到最新首页。URL 已带该版本号时不再跳转，避免死循环。
+      const serverVersion = (data.version || '').replace(/^v/, '');
+      const buildVersion = (process.env.REACT_APP_VERSION || '').replace(/^v/, '');
+      if (serverVersion && serverVersion !== '0.0.0' && buildVersion) {
+        if (buildVersion !== serverVersion) {
+          const url = new URL(window.location.href);
+          if (url.searchParams.get('_v') !== serverVersion) {
+            url.searchParams.set('_v', serverVersion);
+            window.location.replace(url.toString());
+            return;
+          }
         }
         localStorage.setItem('app_version', serverVersion);
       }

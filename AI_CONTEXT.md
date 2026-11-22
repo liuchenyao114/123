@@ -1,6 +1,6 @@
 # message-pusher 定制版 · 项目交接说明
 
-> 供 AI 助手接手本项目时阅读。最后更新：2026-11-22，对应版本 `v0.5.3`。
+> 供 AI 助手接手本项目时阅读。最后更新：2026-11-22，对应版本 `v0.5.4`。
 
 ## 一、项目是什么
 
@@ -10,7 +10,7 @@
 | --- | --- |
 | 公开仓库 | https://github.com/liuchenyao114/123 |
 | 上游基准 | `master@fbbfa58`（2025-11-22，`v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 新） |
-| 当前正式版本 | `v0.5.3` |
+| 当前正式版本 | `v0.5.4` |
 | 下载地址 | https://github.com/liuchenyao114/123/releases/latest |
 | 技术栈 | Go 1.22 + Gin + GORM（SQLite / MySQL）+ gorilla/websocket；React + semantic-ui-react；前端产物用 `go:embed` 内嵌 |
 | 许可证 | MIT（沿用上游） |
