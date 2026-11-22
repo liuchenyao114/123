@@ -4,6 +4,7 @@ import (
 	"errors"
 	"message-pusher/common"
 	"strings"
+	"sync/atomic"
 )
 
 // User if you add sensitive fields, don't forget to clean them in setupLogin function.
@@ -75,7 +76,7 @@ func (user *User) Insert() error {
 	}
 	err = DB.Create(user).Error
 	if err == nil {
-		common.UserCount += 1 // We don't need to use atomic here, because it's not a critical value
+		atomic.AddInt64(&common.UserCount, 1)
 	}
 	return err
 }

@@ -7,6 +7,7 @@ import (
 	"message-pusher/common"
 	"message-pusher/model"
 	"net/http"
+	"sync/atomic"
 )
 
 func GetStatus(c *gin.Context) {
@@ -29,8 +30,8 @@ func GetStatus(c *gin.Context) {
 			"turnstile_site_key":  common.TurnstileSiteKey,
 			"message_persistence": common.MessagePersistenceEnabled,
 			"message_render":      common.MessageRenderEnabled,
-			"message_count":       common.MessageCount,
-			"user_count":          common.UserCount,
+			"message_count":       atomic.LoadInt64(&common.MessageCount),
+			"user_count":          atomic.LoadInt64(&common.UserCount),
 		},
 	})
 	return
@@ -141,6 +142,13 @@ type PasswordResetRequest struct {
 func ResetPassword(c *gin.Context) {
 	var req PasswordResetRequest
 	err := json.NewDecoder(c.Request.Body).Decode(&req)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "无效的请求体",
+		})
+		return
+	}
 	if req.Email == "" || req.Token == "" {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

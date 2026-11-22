@@ -37,7 +37,12 @@ func syncMessageToUser(message *model.Message, userId int) {
 	if !ok {
 		return
 	}
-	*messageChan <- message
+	// 非阻塞发送：客户端消费不过来时丢弃旧消息，既不会阻塞推送主流程，
+	// 也不会在持锁状态下等待，避免与 Remove 抢写锁造成死锁。
+	select {
+	case *messageChan <- message:
+	default:
+	}
 }
 
 func GetNewMessages(c *gin.Context) {

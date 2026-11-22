@@ -37,7 +37,7 @@ const EditChannel = () => {
     const { success, message, data } = res.data;
     if (success) {
       if (data.type === 'corp_app') {
-        const [corp_id, agent_id] = data.app_id.split('|');
+        const [corp_id, agent_id] = (data.app_id || '').split('|');
         data.corp_id = corp_id;
         data.agent_id = agent_id;
       }
@@ -54,7 +54,10 @@ const EditChannel = () => {
   }, []);
 
   const submit = async () => {
-    if (!name) return;
+    if (!name) {
+      showError('请输入通道名称！');
+      return;
+    }
     let res = undefined;
     let localInputs = { ...inputs };
     switch (inputs.type) {
@@ -120,7 +123,7 @@ const EditChannel = () => {
   };
 
   const getTelegramChatId = async () => {
-    if (inputs.telegram_bot_token === '') {
+    if (!inputs.secret) {
       showError('请先输入 Telegram 机器人令牌！');
       return;
     }
@@ -133,13 +136,16 @@ const EditChannel = () => {
       if (result.length === 0) {
         showError(`请先向你的机器人发送一条任意消息！`);
       } else {
-        let id = result[0]?.message?.chat?.id;
-        id = id.toString();
-        setInputs((inputs) => ({ ...inputs, account_id: id }));
+        let id = result[0]?.message?.chat?.id ?? result[0]?.channel_post?.chat?.id;
+        if (!id) {
+          showError('未能获取到会话 ID，请先向机器人发送一条普通消息！');
+          return;
+        }
+        setInputs((inputs) => ({ ...inputs, account_id: id.toString() }));
         showSuccess('会话 ID 获取成功！');
       }
     } else {
-      showError(`发生错误：${res.description}`);
+      showError(`发生错误：${res.data?.description || '未知错误'}`);
     }
   };
 

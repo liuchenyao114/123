@@ -345,6 +345,10 @@ func CloseCmccConnectionsByAPIKey(apiKey string) {
 	if apiKey == "" {
 		return
 	}
+	// 与建连互斥：若 dialCmcc 正在进行（握手+认证最长 25s），等它写入 map 后再关，
+	// 否则会出现关闭完成后旧连接才被写入、永远无人清理的陈旧连接。
+	cmccDialMutex.Lock()
+	defer cmccDialMutex.Unlock()
 	cmccConnectionsMutex.Lock()
 	var targets []*cmccConnection
 	for _, c := range cmccConnections {

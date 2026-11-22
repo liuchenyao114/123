@@ -18,12 +18,13 @@ const (
 )
 
 type webSocketClient struct {
-	key       string
-	conn      *websocket.Conn
-	message   chan *model.Message
-	pong      chan bool
-	stop      chan bool
-	timestamp int64
+	key        string
+	conn       *websocket.Conn
+	message    chan *model.Message
+	pong       chan bool
+	stop       chan bool
+	closeOnce  sync.Once
+	timestamp  int64
 }
 
 func (c *webSocketClient) handleDataReading() {
@@ -43,7 +44,12 @@ func (c *webSocketClient) handleDataReading() {
 		}
 		switch messageType {
 		case websocket.PingMessage:
-			c.pong <- true
+			select {
+			case c.pong <- true:
+			case <-c.stop:
+				return
+			default: // writer 已退出时丢弃，避免阻塞
+			}
 		case websocket.CloseMessage:
 			c.close()
 			break
@@ -100,12 +106,19 @@ func (c *webSocketClient) handleDataWriting() {
 }
 
 func (c *webSocketClient) sendMessage(message *model.Message) {
-	c.message <- message
+	// writer 可能已退出，用 select 避免向无接收者的 channel 永久阻塞
+	select {
+	case c.message <- message:
+	case <-c.stop:
+	case <-time.After(writeWait):
+	}
 }
 
 func (c *webSocketClient) close() {
-	// should only be called once
-	c.stop <- true
+	// 幂等关闭：直接 close(stop) 而非向 channel 发送，避免无接收者时阻塞
+	c.closeOnce.Do(func() {
+		close(c.stop)
+	})
 	// the defer function in handleDataWriting will do the cleanup
 }
 
@@ -138,8 +151,8 @@ func RegisterClient(channelName string, userId int, conn *websocket.Conn) {
 	newClient := &webSocketClient{
 		key:       key,
 		conn:      conn,
-		message:   make(chan *model.Message),
-		pong:      make(chan bool),
+		message:   make(chan *model.Message, 32),
+		pong:      make(chan bool, 8),
 		stop:      make(chan bool),
 		timestamp: time.Now().UnixMilli(),
 	}

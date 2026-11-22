@@ -11,6 +11,7 @@ import (
 	"message-pusher/common"
 	"message-pusher/model"
 	"message-pusher/router"
+	"net/http"
 	"os"
 	"strconv"
 )
@@ -68,6 +69,8 @@ func main() {
 	store.Options(sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   os.Getenv("COOKIE_SECURE") == "true", // 反代 HTTPS 部署时设 COOKIE_SECURE=true
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   30 * 24 * 3600,
 	})
 	server.Use(sessions.Sessions("session", store))

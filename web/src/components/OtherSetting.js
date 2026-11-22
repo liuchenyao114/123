@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Divider, Form, Grid, Header, Modal } from 'semantic-ui-react';
-import { API, showError, showSuccess } from '../helpers';
-import { marked } from 'marked';
+import { API, renderSafeMarkdown, showError, showSuccess } from '../helpers';
 
 const OtherSetting = () => {
   let [inputs, setInputs] = useState({
@@ -99,7 +98,7 @@ const OtherSetting = () => {
       } else {
         setUpdateData({
           tag_name: tag_name,
-          content: marked.parse(body || ''),
+          content: renderSafeMarkdown(body || ''),
         });
         setShowUpdateModal(true);
       }

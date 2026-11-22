@@ -3,6 +3,7 @@ package channel
 import (
 	"errors"
 	"fmt"
+	"message-pusher/common"
 	"message-pusher/model"
 	"strings"
 )
@@ -20,8 +21,10 @@ func SendGroupMessage(message *model.Message, user *model.User, channel_ *model.
 	}
 	errMessage := ""
 	for i := 0; i < len(subChannels); i++ {
-		message.To = subTargets[i]
-		message.Channel = subChannels[i]
+		// 每个子通道使用独立的消息副本，避免原地修改共享的 message 导致串扰
+		subMessage := *message
+		subMessage.To = subTargets[i]
+		subMessage.Channel = subChannels[i]
 		subChannel, err := model.GetChannelByName(subChannels[i], user.Id)
 		if err != nil {
 			return errors.New("获取群组消息子通道失败：" + err.Error())
@@ -29,7 +32,11 @@ func SendGroupMessage(message *model.Message, user *model.User, channel_ *model.
 		if subChannel.Type == model.TypeGroup {
 			return errors.New("群组消息子通道不能是群组消息")
 		}
-		err = SendMessage(message, user, subChannel)
+		if subChannel.Status != common.ChannelStatusEnabled {
+			errMessage += fmt.Sprintf("发送群组消息子通道 %s 失败：该通道已被禁用\n", subChannels[i])
+			continue
+		}
+		err = SendMessage(&subMessage, user, subChannel)
 		if err != nil {
 			errMessage += fmt.Sprintf("发送群组消息子通道 %s 失败：%s\n", subChannels[i], err.Error())
 		}

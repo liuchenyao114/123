@@ -34,12 +34,25 @@ func GenerateVerificationCode(length int) string {
 func RegisterVerificationCodeWithKey(key string, code string, purpose string) {
 	verificationMutex.Lock()
 	defer verificationMutex.Unlock()
+	// 先无条件清理过期项，避免短时间内大量未过期条目让 map 无限增长
+	removeExpiredPairs()
+	if len(verificationMap) >= verificationMapMaxSize {
+		// 达到硬上限时，删除最早的一条再插入
+		var oldestKey string
+		var oldestTime time.Time
+		for k, v := range verificationMap {
+			if oldestKey == "" || v.time.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = v.time
+			}
+		}
+		if oldestKey != "" {
+			delete(verificationMap, oldestKey)
+		}
+	}
 	verificationMap[purpose+key] = verificationValue{
 		code: code,
 		time: time.Now(),
-	}
-	if len(verificationMap) > verificationMapMaxSize {
-		removeExpiredPairs()
 	}
 }
 

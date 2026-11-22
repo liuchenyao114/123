@@ -31,9 +31,10 @@ jobs:
         run: |
           go mod download
           go build -ldflags "-X 'message-pusher/common.Version=$(git describe --tags)'" -o message-pusher-macos
-      - name: Release
+      # 发布统一由 workflows/release.yml 负责；此处仅保留构建验证，避免打 tag 时多个 workflow 抢发 Release
+      - name: Release (disabled; use release.yml)
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        if: ${{ false }}
         with:
           files: message-pusher-macos
           draft: true

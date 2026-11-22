@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -48,6 +49,8 @@ func GetPushMessage(c *gin.Context) {
 
 func PostPushMessage(c *gin.Context) {
 	var message model.Message
+	// 限制请求体大小，避免超大 body 耗尽内存
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
 	if strings.Contains(strings.ToLower(c.Request.Header.Get("Content-Type")), "application/json") {
 		// Looks like the user is using JSON
 		message = model.Message{}
@@ -272,7 +275,7 @@ func saveAndSendMessage(user *model.User, message *model.Message, channel_ *mode
 	if channel_.Status != common.ChannelStatusEnabled {
 		return errors.New("该渠道已被禁用")
 	}
-	common.MessageCount += 1 // We don't need to use atomic here because it's not a critical value
+	atomic.AddInt64(&common.MessageCount, 1)
 	message.Link = common.GetUUID()
 	if message.URL == "" {
 		message.URL = fmt.Sprintf("%s/message/%s", common.ServerAddress, message.Link)
@@ -433,7 +436,7 @@ func GetMessageStatus(c *gin.Context) {
 
 func SearchMessages(c *gin.Context) {
 	keyword := c.Query("keyword")
-	messages, err := model.SearchMessages(keyword)
+	messages, err := model.SearchMessages(keyword, c.GetInt("id"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -454,10 +457,14 @@ func ResendMessage(c *gin.Context) {
 	userId := c.GetInt("id")
 	helper := func() error {
 		message, err := model.GetMessageByIds(messageId, userId)
-		message.Id = 0
 		if err != nil {
 			return err
 		}
+		// 重发必须生成新的 Link，否则违反 link 唯一约束；同时重置时间戳与状态
+		message.Id = 0
+		message.Link = common.GetUUID()
+		message.URL = ""
+		message.Timestamp = time.Now().Unix()
 		user, err := model.GetUserById(userId, true)
 		if err != nil {
 			return err

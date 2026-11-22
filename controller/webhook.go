@@ -8,6 +8,7 @@ import (
 	"message-pusher/common"
 	"message-pusher/model"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -189,6 +190,8 @@ func UpdateWebhook(c *gin.Context) {
 }
 
 func TriggerWebhook(c *gin.Context) {
+	// 限制请求体大小，避免超大 body 耗尽内存
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
 	jsonData, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -238,8 +241,14 @@ func TriggerWebhook(c *gin.Context) {
 		})
 		return
 	}
-	for key, value := range extractRule {
-		variableValue := gjson.Get(reqText, value).String()
+	// map 迭代顺序随机，若变量值中包含另一个 $key 会造成级联替换；按 key 长度倒序一次性替换
+	keys := make([]string, 0, len(extractRule))
+	for key := range extractRule {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool { return len(keys[i]) > len(keys[j]) })
+	for _, key := range keys {
+		variableValue := gjson.Get(reqText, extractRule[key]).String()
 		webhook.ConstructRule = common.Replace(webhook.ConstructRule, "$"+key, variableValue, -1)
 	}
 	constructRule := model.WebhookConstructRule{}

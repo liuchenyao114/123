@@ -12,8 +12,8 @@ var SystemName = "消息推送服务"
 var ServerAddress = "http://localhost:3000"
 var Footer = ""
 var HomePageLink = ""
-var MessageCount = 0 // Non critical value, no need to use atomic
-var UserCount = 0    // Non critical value, no need to use atomic
+var MessageCount int64 // atomic 访问，避免并发推送时数据竞争
+var UserCount int64    // atomic 访问，避免并发注册时数据竞争
 
 // Any options with "Secret", "Token" in its key won't be return by GetOptions
 

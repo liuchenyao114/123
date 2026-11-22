@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Header, Segment } from 'semantic-ui-react';
-import { API, showError } from '../../helpers';
-import { marked } from 'marked';
+import { API, renderSafeMarkdown, showError } from '../../helpers';
 
 const About = () => {
   const [about, setAbout] = useState('');
@@ -12,7 +11,7 @@ const About = () => {
     const res = await API.get('/api/about');
     const { success, message, data } = res.data;
     if (success) {
-      let HTMLAbout = marked.parse(data);
+      let HTMLAbout = renderSafeMarkdown(data);
       setAbout(HTMLAbout);
       localStorage.setItem('about', HTMLAbout);
     } else {

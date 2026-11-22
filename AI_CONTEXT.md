@@ -1,6 +1,6 @@
 # message-pusher 定制版 · 项目交接说明
 
-> 供 AI 助手接手本项目时阅读。最后更新：2026-11-22，对应版本 `v0.5.2`。
+> 供 AI 助手接手本项目时阅读。最后更新：2026-11-22，对应版本 `v0.5.3`。
 
 ## 一、项目是什么
 
@@ -10,7 +10,7 @@
 | --- | --- |
 | 公开仓库 | https://github.com/liuchenyao114/123 |
 | 上游基准 | `master@fbbfa58`（2025-11-22，`v0.4.13-alpha-4-gfbbfa58`，比最新正式版 `v0.4.12` 新） |
-| 当前正式版本 | `v0.5.2` |
+| 当前正式版本 | `v0.5.3` |
 | 下载地址 | https://github.com/liuchenyao114/123/releases/latest |
 | 技术栈 | Go 1.22 + Gin + GORM（SQLite / MySQL）+ gorilla/websocket；React + semantic-ui-react；前端产物用 `go:embed` 内嵌 |
 | 许可证 | MIT（沿用上游） |
@@ -26,6 +26,7 @@
 | 移除 `tencent_alarm` | 腾讯云自定义告警 / 短信通道的代码、界面、文档全部删除 |
 | 修复鉴权绕过 | 旧逻辑在「设了全局令牌、通道未设令牌」时不带 token 也能推送；现改为必须匹配全局令牌或该通道令牌 |
 | 构建与发布自动化 | push 到 `main` 自动重建前端 + 跑单元测试 + 编译 linux/amd64；打 `v*` tag 或手动触发自动发布 4 平台正式 Release |
+| 全量代码审查修复（v0.5.3） | 修复消息搜索越权、Markdown XSS（引入 DOMPurify 净化）、TokenStore 并发写 map 致命崩溃、WebSocket/SSE 死锁、重发消息 link 冲突、DeleteUser 响应颠倒、SMTP 跳过证书校验、前端 axios 拦截器吞错、CI 重复发布冲突；仓库内 `web/build` 已从源码重建，与源码一致。OAuth state/CSRF 与默认弱口令为上游遗留、未改动 |
 | 修复版本显示错乱（v0.5.2） | `middleware.Cache()` 原先对所有响应设置一周缓存，导致升级后浏览器仍加载旧前端：页脚显示旧版本、系统信息显示新版本、反复弹「新版本可用」。现改为只有带内容 hash 的 `/static/` 资源长期缓存，首页与 API 一律 `no-store`；页脚与「检查更新」改以 `/api/status` 的服务端版本为准 |
 
 **重要**：`multi` 组合通道曾短暂加入，现已**完全回滚**。用户明确要求「新建消息通道」页保持上游原始逻辑（一个通道选一种类型），多选能力只在 Webhook 接口页与 `channel=a|b` 中提供。请勿重新引入。

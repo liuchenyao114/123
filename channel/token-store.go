@@ -75,12 +75,12 @@ func TokenStoreInit() {
 			common.FatalLog(err.Error())
 		}
 		items := channels2items(channels)
-		s.Mutex.RLock()
+		s.Mutex.Lock()
 		for i := range items {
 			// s.Map[item.Key()] = &item  // This is wrong, you are getting the address of a local variable!
 			s.Map[items[i].Key()] = &items[i]
 		}
-		s.Mutex.RUnlock()
+		s.Mutex.Unlock()
 		for {
 			s.Mutex.RLock()
 			var tmpMap = make(map[string]*TokenStoreItem)
@@ -91,7 +91,7 @@ func TokenStoreInit() {
 			for k := range tmpMap {
 				(*tmpMap[k]).Refresh()
 			}
-			s.Mutex.RLock()
+			s.Mutex.Lock()
 			// we shouldn't directly replace the old map with the new map, cause the old map's keys may already change
 			for k := range s.Map {
 				v, okay := tmpMap[k]
@@ -100,7 +100,7 @@ func TokenStoreInit() {
 				}
 			}
 			sleepDuration := common.Max(s.ExpirationSeconds, 60)
-			s.Mutex.RUnlock()
+			s.Mutex.Unlock()
 			time.Sleep(time.Duration(sleepDuration) * time.Second)
 		}
 	}()
@@ -112,15 +112,15 @@ func TokenStoreAddItem(item TokenStoreItem) {
 		return
 	}
 	item.Refresh()
-	s.Mutex.RLock()
+	s.Mutex.Lock()
 	s.Map[item.Key()] = &item
-	s.Mutex.RUnlock()
+	s.Mutex.Unlock()
 }
 
 func TokenStoreRemoveItem(item TokenStoreItem) {
-	s.Mutex.RLock()
+	s.Mutex.Lock()
 	delete(s.Map, item.Key())
-	s.Mutex.RUnlock()
+	s.Mutex.Unlock()
 }
 
 func TokenStoreAddUser(user *model.User) {

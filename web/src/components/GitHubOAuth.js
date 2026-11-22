@@ -28,7 +28,7 @@ const GitHubOAuth = () => {
       }
     } else {
       showError(message);
-      if (count === 0) {
+      if (count >= 3) {
         setPrompt(`操作失败，重定向至登录界面中...`);
         navigate('/setting'); // in case this is failed to bind GitHub
         return;

@@ -74,9 +74,11 @@ func GetMessagesByUserId(userId int, startIdx int, num int) (messages []*Message
 	return messages, err
 }
 
-func SearchMessages(keyword string) (messages []*Message, err error) {
+func SearchMessages(keyword string, userId int) (messages []*Message, err error) {
+	// 必须限定当前用户，否则任何登录用户都能搜到全库消息内容（越权泄露）
 	err = DB.Select([]string{"id", "title", "channel", "timestamp", "status"}).
-		Where("id = ? or title LIKE ? or description LIKE ? or content LIKE ?", keyword, keyword+"%", keyword+"%", keyword+"%").
+		Where("user_id = ? AND (id = ? or title LIKE ? or description LIKE ? or content LIKE ?)",
+			userId, keyword, keyword+"%", keyword+"%", keyword+"%").
 		Order("id desc").
 		Find(&messages).Error
 	return messages, err

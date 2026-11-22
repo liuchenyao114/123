@@ -78,6 +78,11 @@ export function showError(error) {
   console.error(error);
   if (error.message) {
     if (error.name === 'AxiosError') {
+      // 断网 / CORS / 超时场景下 error.response 为空，二次访问 .status 会抛异常
+      if (!error.response) {
+        toast.error('错误：无法连接服务器，请检查网络或服务状态！', showErrorOptions);
+        return;
+      }
       switch (error.response.status) {
         case 401:
           // toast.error('错误：未登录或登录已过期，请重新登录！', showErrorOptions);
@@ -90,7 +95,7 @@ export function showError(error) {
           toast.error('错误：服务器内部错误，请联系管理员！', showErrorOptions);
           break;
         case 405:
-          toast.info('本站仅作演示之用，无服务端！');
+          toast.error('错误：请求方法不被允许！', showErrorOptions);
           break;
         default:
           toast.error('错误：' + error.message, showErrorOptions);
